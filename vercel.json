@@ -5,7 +5,7 @@
       "maxDuration": 30
     },
     "api/analisis.js": {
-      "maxDuration": 30
+      "maxDuration": 60
     },
     "api/kpi/[zone].js": {
       "maxDuration": 30

@@ -25,7 +25,9 @@ const { requireUser } = require('./_lib/require-user');
 
 const DEFAULT_URL =
   'https://qbougldvlmceeqceduae.supabase.co/functions/v1/analisis-scm-api/all';
-const TIMEOUT_MS = 25000;
+const TIMEOUT_MS = 50000;
+let lastGood = null; // { at, data } — cache memori per instance
+const STALE_MS = 10 * 60 * 1000;
 let warnedUrl = false;
 let warnedNoAccessKey = false;
 
@@ -81,6 +83,7 @@ module.exports = async function handler(req, res) {
       } catch (_) {
         /* abaikan */
       }
+      if (lastGood && Date.now() - lastGood.at < STALE_MS) { res.status(200).json({ ok: true, timestamp: lastGood.at, stale: true, data: lastGood.data }); return; }
       res.status(502).json({
         ok: false,
         error: `Endpoint analisis merespons HTTP ${upstream.status}${bodyMsg ? ` — ${bodyMsg}` : ''}`,
@@ -89,6 +92,7 @@ module.exports = async function handler(req, res) {
     }
 
     const data = await upstream.json();
+    lastGood = { at: Date.now(), data };
     // Cache singkat di edge Vercel: data berasal dari view yang berubah per upload/shipment,
     // bukan per detik, jadi 30 detik sudah cukup segar.
     res.setHeader('Cache-Control', 's-maxage=30, stale-while-revalidate=60');
@@ -98,6 +102,7 @@ module.exports = async function handler(req, res) {
       e.name === 'AbortError'
         ? `Timeout — endpoint analisis tidak merespons dalam ${TIMEOUT_MS / 1000} detik.`
         : e.message || 'Gagal mengambil data analisis (alasan tidak diketahui).';
+    if (lastGood && Date.now() - lastGood.at < STALE_MS) { res.status(200).json({ ok: true, timestamp: lastGood.at, stale: true, data: lastGood.data }); return; }
     res.status(502).json({ ok: false, error: message });
   } finally {
     clearTimeout(timer);

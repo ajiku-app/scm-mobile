@@ -43,10 +43,10 @@
   var CK = 'scm_m_cache_v1';
   function save() { try { localStorage.setItem(CK, JSON.stringify({ kpi: S.kpi, an: S.an, at: S.at, email: S.email })); } catch (e) {} }
   function restore() { try { var c = JSON.parse(localStorage.getItem(CK) || 'null'); if (c && c.kpi) { S.kpi = c.kpi; S.an = c.an; S.at = c.at; S.email = c.email || ''; S.stale = 1; S.ok = true; } } catch (e) {} }
-  async function get(url) {
-    var ac = new AbortController(), tm = setTimeout(function () { ac.abort(); }, 40000), res, j = null;
+  async function get(url, ms) {
+    var ac = new AbortController(), tm = setTimeout(function () { ac.abort(); }, ms || 40000), res, j = null;
     try { res = await window.SCM_AUTH.authFetch(url, { headers: { Accept: 'application/json' }, cache: 'no-store', signal: ac.signal }); try { j = await res.json(); } catch (e) {} }
-    catch (e) { throw new Error(e.name === 'AbortError' ? 'Koneksi lambat, tidak ada respons dalam 40 detik.' : e.message); }
+    catch (e) { throw new Error(e.name === 'AbortError' ? 'Koneksi lambat, server belum merespons. Coba segarkan.' : e.message); }
     finally { clearTimeout(tm); }
     if (!res.ok || !j || !j.ok) { var er = j && j.error; throw new Error(typeof er === 'string' ? er : er ? JSON.stringify(er) : 'HTTP ' + res.status); }
     return j;
@@ -64,7 +64,7 @@
       render();
     }
   }
-  async function anLoad() { try { S.an = (await get('/api/analisis')).data; S.anErr = ''; } catch (e) { S.anErr = e.message; } render(); }
+  async function anLoad(t) { try { S.an = (await get('/api/analisis', 65000)).data; S.anErr = ''; } catch (e) { if (t == null) return anLoad(1); S.anErr = e.message; } render(); }
   async function load() {
     if (S.busy) return; S.busy = 1;
     var f = document.querySelector('.fab'); if (f) f.classList.add('spin');

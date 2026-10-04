@@ -34,7 +34,7 @@ const ZONES = {
 };
 
 const ZONE_KEYS = Object.keys(ZONES);
-const FETCH_TIMEOUT_MS = 8000;
+const FETCH_TIMEOUT_MS = 25000;
 
 let warnedUrlZones = new Set();
 let warnedAnonKey = false;
@@ -74,7 +74,7 @@ function resolveAnonKey() {
   return DEFAULT_SUPABASE_ANON_KEY;
 }
 
-async function fetchZoneLive(zoneKey) {
+async function fetchZoneRaw(zoneKey) {
   if (!Object.prototype.hasOwnProperty.call(ZONES, zoneKey)) {
     return { status: 'error', data: null, error: `Zona tidak dikenal: "${zoneKey}".` };
   }
@@ -121,6 +121,21 @@ async function fetchZoneLive(zoneKey) {
   } finally {
     clearTimeout(timer);
   }
+}
+
+// Cache memori per instance serverless: kalau Edge Function sedang lambat/timeout, pakai data terakhir
+// yang berhasil (maks 10 menit) daripada menampilkan error. Hanya dipanggil SETELAH requireUser lolos.
+const lastGood = new Map();
+const STALE_MS = 10 * 60 * 1000;
+async function fetchZoneLive(zoneKey) {
+  const r = await fetchZoneRaw(zoneKey);
+  if (r.status === 'live') {
+    lastGood.set(zoneKey, { at: Date.now(), data: r.data });
+    return r;
+  }
+  const g = lastGood.get(zoneKey);
+  if (g && Date.now() - g.at < STALE_MS) return { status: 'live', data: g.data, error: null, stale: true };
+  return r;
 }
 
 module.exports = { ZONES, ZONE_KEYS, resolveUrl, resolveAnonKey, fetchZoneLive, FETCH_TIMEOUT_MS };
