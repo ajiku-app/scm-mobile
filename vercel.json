@@ -2,13 +2,13 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "functions": {
     "api/kpi.js": {
-      "maxDuration": 10
+      "maxDuration": 30
     },
     "api/analisis.js": {
       "maxDuration": 30
     },
     "api/kpi/[zone].js": {
-      "maxDuration": 10
+      "maxDuration": 30
     }
   },
   "headers": [

@@ -40,30 +40,42 @@
   var PICK = [['stock', 3], ['stock', 4], ['logistics', 2], ['logistics', 3], ['fefo', 1], ['warehouse', 2]];
   var SEC = [['armada', 'Armada'], ['prioritas', 'Prioritas'], ['peringatan', 'Peringatan'], ['kendaraan', 'Kendaraan'], ['prediksi', 'Prediksi'], ['stok_vs_kirim', 'Stok vs Kirim'], ['tren', 'Tren'], ['harian', 'Harian'], ['durasi_ringkas', 'Durasi truk'], ['shipments_ringkas', 'Pengiriman'], ['pareto', 'Pareto'], ['biaya_carton', 'Biaya'], ['estimasi_budget', 'Budget'], ['sku_belum_master', 'Data master'], ['peta', 'Peta']];
 
+  var CK = 'scm_m_cache_v1';
+  function save() { try { localStorage.setItem(CK, JSON.stringify({ kpi: S.kpi, an: S.an, at: S.at, email: S.email })); } catch (e) {} }
+  function restore() { try { var c = JSON.parse(localStorage.getItem(CK) || 'null'); if (c && c.kpi) { S.kpi = c.kpi; S.an = c.an; S.at = c.at; S.email = c.email || ''; S.stale = 1; S.ok = true; } } catch (e) {} }
   async function get(url) {
-    var res = await window.SCM_AUTH.authFetch(url, { headers: { Accept: 'application/json' }, cache: 'no-store' });
-    var j = null; try { j = await res.json(); } catch (e) {}
+    var ac = new AbortController(), tm = setTimeout(function () { ac.abort(); }, 40000), res, j = null;
+    try { res = await window.SCM_AUTH.authFetch(url, { headers: { Accept: 'application/json' }, cache: 'no-store', signal: ac.signal }); try { j = await res.json(); } catch (e) {} }
+    catch (e) { throw new Error(e.name === 'AbortError' ? 'Koneksi lambat, tidak ada respons dalam 40 detik.' : e.message); }
+    finally { clearTimeout(tm); }
     if (!res.ok || !j || !j.ok) { var er = j && j.error; throw new Error(typeof er === 'string' ? er : er ? JSON.stringify(er) : 'HTTP ' + res.status); }
     return j;
   }
+  // tiap zona dimuat sendiri-sendiri & langsung ditampilkan begitu datang (tidak menunggu zona paling lambat)
+  async function zoneLoad(k, tries) {
+    S.kpi = S.kpi || { zones: {} };
+    try {
+      var v = await get('/api/kpi/' + k);
+      if (v.status === 'live' && v.data) { S.kpi.zones[k] = { status: 'live', data: v.data, error: null }; render(); return; }
+      throw new Error(v.error || 'Gagal memuat zona');
+    } catch (e) {
+      if (tries > 0) { await new Promise(function (r) { setTimeout(r, 1500); }); return zoneLoad(k, tries - 1); }
+      if (!zone(k)) S.kpi.zones[k] = { status: 'error', data: null, error: e.message };   // data tersimpan tetap dipakai bila ada
+      render();
+    }
+  }
+  async function anLoad() { try { S.an = (await get('/api/analisis')).data; S.anErr = ''; } catch (e) { S.anErr = e.message; } render(); }
   async function load() {
+    if (S.busy) return; S.busy = 1;
     var f = document.querySelector('.fab'); if (f) f.classList.add('spin');
     try {
       await window.SCM_AUTH_READY;
       var s = await window.scmSupabase.auth.getSession();
       S.email = (s.data.session && s.data.session.user.email) || '';
-      var r = await Promise.allSettled([get('/api/kpi'), get('/api/analisis')]);
-      if (r[0].status === 'fulfilled') S.kpi = r[0].value;
-      if (r[1].status === 'fulfilled') { S.an = r[1].value.data; S.anErr = ''; } else S.anErr = r[1].reason.message;
-      S.ok = r[0].status === 'fulfilled'; S.at = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
-      render();
-      var bad = S.kpi ? Object.keys(Z).filter(function (k) { return !zone(k); }) : [];   // coba ulang zona yang gagal, satu per satu
-      if (bad.length) {
-        var rr = await Promise.allSettled(bad.map(function (k) { return get('/api/kpi/' + k); }));
-        rr.forEach(function (x, i) { var v = x.status === 'fulfilled' && x.value; if (v && v.status === 'live' && v.data) S.kpi.zones[bad[i]] = { status: 'live', data: v.data, error: null }; else if (v && v.error) S.kpi.zones[bad[i]].error = v.error; });
-      }
+      await Promise.all(Object.keys(Z).map(function (k) { return zoneLoad(k, 1); }).concat(anLoad()));
+      S.ok = Object.keys(Z).some(zone); S.stale = 0; S.at = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }); save();
     } catch (e) { S.ok = false; S.anErr = e.message; }
-    render(); f = document.querySelector('.fab'); if (f) f.classList.remove('spin');
+    S.busy = 0; S.last = Date.now(); render(); f = document.querySelector('.fab'); if (f) f.classList.remove('spin');
   }
 
   function status() { return '<span class="chip"><span class="dot' + (S.ok ? '' : ' err') + '"></span>' + (S.ok ? 'Online' : 'Offline') + '</span>'; }
@@ -86,7 +98,7 @@
     return '<div class="it"><span class="ico ' + k + '">' + ic('warn') + '</span><div><b>' + esc(r.judul) + '</b><small>' + esc(r.detail).slice(0, 90) + '</small></div>' + tg(r.tingkat) + '</div>';
   }
   function errNote() {
-    var m = Object.keys(Z).filter(function (k) { return !zone(k); }).map(function (k) { return '<b>' + Z[k].t + ':</b> ' + esc((zerr(k) || 'belum ada data').slice(0, 140)); });
+    var m = S.busy ? [] : Object.keys(Z).filter(function (k) { return !zone(k); }).map(function (k) { return '<b>' + Z[k].t + ':</b> ' + esc((zerr(k) || 'belum ada data').slice(0, 140)); });
     return m.length ? '<div class="note">' + m.join('<br>') + '</div>' : '';
   }
 
@@ -149,12 +161,12 @@
   function home() {
     var vs = ['stock', 'logistics', 'fefo'].map(function (k) { var d = zone(k); return d ? Number(Z[k].main(d)) : NaN; }).filter(isFinite);
     var sc = vs.length ? vs.reduce(function (a, b) { return a + b; }, 0) / vs.length : NaN, al4 = (S.an && S.an.peringatan || []).slice(0, 4);
-    return head('SCM Tower', S.at ? 'Disinkron pukul ' + S.at : 'Memuat data...') +
+    return head('SCM Tower', S.at ? (S.stale ? 'Data tersimpan ' : 'Disinkron pukul ') + S.at : 'Memuat data...') +
       '<div class="chips"><span class="chip">Hari ini</span>' + status() + '<span class="chip good">' + esc(S.email.split('@')[0] || 'pengguna') + '</span></div>' +
       '<div class="hero"><div><div class="lb">Skor operasional</div><div class="big">' + (isFinite(sc) ? Math.round(sc) : '-') + '<small>%</small></div><p>' + (isFinite(sc) ? lbl(sc) + ' · dari ' + vs.length + ' dari 3 indikator' : 'Menunggu data') + '</p></div>' + gauge(sc, '#14201A') + '</div>' + errNote() +
       '<div class="card"><h4>Zona operasional</h4>' + Object.keys(Z).map(function (k) {
         var d = zone(k), v = d ? Number(Z[k].main(d)) : NaN, ok = isFinite(v);
-        return '<button class="zr" data-v="z:' + k + '"><div class="row"><span>' + Z[k].t + ' · ' + Z[k].s + (d ? '' : ' <i class="tag e">Gagal</i>') + '</span><b>' + (ok ? n(v, 1) + (Z[k].raw ? '/hari' : '%') : '-') + '</b></div><div class="bar"><i style="width:' + (ok ? Z[k].raw ? 100 : Math.min(100, v) : 0) + '%;background:' + COL[k] + '"></i></div></button>';
+        return '<button class="zr" data-v="z:' + k + '"><div class="row"><span>' + Z[k].t + ' · ' + Z[k].s + (d ? '' : ' <i class="tag e">' + (S.busy ? 'Memuat' : 'Gagal') + '</i>') + '</span><b>' + (ok ? n(v, 1) + (Z[k].raw ? '/hari' : '%') : '-') + '</b></div><div class="bar"><i style="width:' + (ok ? Z[k].raw ? 100 : Math.min(100, v) : 0) + '%;background:' + COL[k] + '"></i></div></button>';
       }).join('') + '</div>' +
       '<div class="tiles">' + PICK.map(function (p) { var d = zone(p[0]), x = Z[p[0]].k[p[1]], v = d && x[1](d); return d && v != null && isFinite(Number(v)) ? tile(x[0], x[2](v, d)) : ''; }).join('') + '</div>' +
       armadaCharts() + alertDonut() + '<div class="row" style="margin:16px 4px 10px"><b>Peringatan berjalan</b><button data-v="an" data-s="peringatan" style="border:0;background:none;color:var(--good);font-weight:700;font-size:12px">Lihat semua</button></div>' +
@@ -250,8 +262,8 @@
     else if (t.dataset.v) { if (t.dataset.s) S.sub = t.dataset.s; S.v = t.dataset.v; render(); window.scrollTo(0, 0); }
     else if (t.dataset.s) { S.sub = t.dataset.s; render(); }
     else if (t.dataset.a === 'reload') load();
-    else if (t.dataset.a === 'out') { sessionStorage.removeItem('scm_face_ok'); window.scmSupabase.auth.signOut().then(function () { location.replace('/'); }); }
+    else if (t.dataset.a === 'out') { sessionStorage.removeItem('scm_face_ok'); try { localStorage.removeItem(CK); } catch (e) {} window.scmSupabase.auth.signOut().then(function () { location.replace('/'); }); }
   });
-  document.addEventListener('visibilitychange', function () { if (!document.hidden) load(); });
-  render(); load();
+  document.addEventListener('visibilitychange', function () { if (!document.hidden && Date.now() - (S.last || 0) > 60000) load(); });
+  restore(); render(); load();
 })();
