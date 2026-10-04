@@ -1,0 +1,7 @@
+{
+  "name": "scm-mobile",
+  "version": "1.0.0",
+  "private": true,
+  "description": "SCM Tower Mobile — versi mobile ringkas (PWA) untuk SCM Control Tower. Statis + 2 serverless API (Vercel).",
+  "engines": { "node": ">=18" }
+}

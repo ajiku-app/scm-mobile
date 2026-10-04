@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#EEF1EC">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+CiAgPHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTQiIGZpbGw9IiMwNzE0MjIiLz4KICA8cmVjdCB4PSIyIiB5PSIyIiB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHJ4PSIxMiIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMTczMjQ3IiBzdHJva2Utd2lkdGg9IjEuNSIvPgogIDxwb2x5Z29uIHBvaW50cz0iMzIsMTAgNTEuMDUsMjEgNTEuMDUsNDMgMzIsNTQgMTIuOTUsNDMgMTIuOTUsMjEiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzM4YmRmOCIgc3Ryb2tlLXdpZHRoPSIyLjQiLz4KICA8dGV4dCB4PSIzMiIgeT0iMzMuNSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1mYW1pbHk9IkFyaWFsLCBIZWx2ZXRpY2EsIHNhbnMtc2VyaWYiIGZvbnQtd2VpZ2h0PSI3MDAiIGZvbnQtc2l6ZT0iOS41IiBsZXR0ZXItc3BhY2luZz0iMC4yIiBmaWxsPSIjZmZmZmZmIj5TQ008L3RleHQ+Cjwvc3ZnPgo=">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/auth.css">
+<title>Masuk — SCM Control Tower</title>
+</head>
+<body>
+<div class="bg"></div>
+<div class="lg">
+  <div class="top">
+    <div class="mk"><svg viewBox="0 0 24 24"><path d="M21 8l-9-5-9 5v8l9 5 9-5zM3 8l9 5 9-5M12 13v8"/></svg></div>
+    <h1>Selamat datang kembali</h1>
+    <p>Masuk dengan email dan kata sandi untuk membuka SCM Control Tower.</p>
+  </div>
+  <div class="sheet">
+    <div id="lfMsg" class="lf-msg"></div>
+
+    <form id="lfPassStep" class="lf-step active" autocomplete="on">
+      <div class="lf-field"><label for="lfEmail">Email</label><input id="lfEmail" type="email" placeholder="nama@perusahaan.com" autocomplete="username" required></div>
+      <div class="lf-field"><label for="lfPass">Kata sandi</label><input id="lfPass" type="password" placeholder="••••••••" autocomplete="current-password" required></div>
+      <button type="submit" class="lf-btn" id="lfPassBtn">Masuk</button>
+    </form>
+
+    <div id="lfFaceStep" class="lf-step">
+      <div class="lf-user-chip"><span id="lfWhoAmI">—</span><a href="#" id="lfSignOut">Bukan Anda? Keluar</a></div>
+      <div class="lf-video-wrap" id="lfVideoWrap"><video id="lfVideo" muted playsinline></video></div>
+      <div id="lfMood" class="lf-mood"><span class="lf-mood-emoji" id="lfMoodEmoji">🙂</span><span><b id="lfMoodLabel">—</b><span class="lf-mood-note" id="lfMoodNote"></span></span></div>
+      <button type="button" class="lf-btn" id="lfFaceBtn">Verifikasi wajah</button>
+      <button type="button" class="lf-btn secondary" id="lfEnrollLink" style="margin-top:8px;display:none;">Daftarkan wajah saya</button>
+    </div>
+
+    <div class="lf-foot">Akses dijaga login akun</div>
+  </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="/assets/supabase-client.js"></script>
+<script src="/assets/login-page.js"></script>
+</body>
+</html>
