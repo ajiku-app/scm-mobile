@@ -1,7 +1,7 @@
 (function () {
   var DESKTOP_URL = 'https://scm-control.vercel.app/index.html'; // ganti bila alamat versi desktop berubah
   var $ = function (id) { return document.getElementById(id); };
-  var S = { v: 'home', sub: 'armada', kpi: null, an: null, anErr: '', email: '', ok: false, at: '', pk: {}, anSec: {}, fresh: {}, pg: {} }, uid = 0;
+  var S = { v: 'home', sub: 'armada', kpi: null, an: null, anErr: '', email: '', ok: false, at: '', pk: {}, anSec: {}, fresh: {}, pg: {}, snap: {} }, uid = 0;
   var P = {
     box: '<path d="M21 8l-9-5-9 5v8l9 5 9-5zM3 8l9 5 9-5M12 13v8"/>', truck: '<path d="M2 6h11v10H2zM13 10h4l3 3v3h-7zM6 19a2 2 0 1 0 0 .1M17 19a2 2 0 1 0 0 .1"/>',
     clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>', users: '<circle cx="9" cy="8" r="3"/><path d="M3 20c0-3.5 3-6 6-6s6 2.500 6 6M16 5a3 3 0 0 1 0 6M21 20c0-2.500-1.500-4.500-4-5.500"/>',
@@ -78,7 +78,7 @@
     S.kpi = S.kpi || { zones: {} };
     if (tries === 1) tstart(k);
     try {
-      var v = await get('/api/kpi/' + k);
+      var v = await get('/api/kpi/' + k, 25000);
       if (v.status === 'live' && v.data) { S.kpi.zones[k] = { status: 'live', data: v.data, error: null }; tend(k, 1); render(); return; }
       throw new Error(v.error || 'Gagal memuat zona');
     } catch (e) {
@@ -92,18 +92,52 @@
     if (Array.isArray(p)) return p; if (!p || typeof p !== 'object') return null; if (Array.isArray(p[k])) return p[k]; if (p.data) return rowsOf(p.data, k);
     var a = Object.keys(p).filter(function (x) { return Array.isArray(p[x]); })[0]; return a ? p[a] : null;
   }
-  // Analisis dimuat per bagian (tab), tidak sekaligus
+  // ---------- Analisis: baca SNAPSHOT (tabel analisis_snapshot, dihitung sekali setelah upload harian) ----------
+  // Cepat (milidetik) karena tidak menghitung view berat. Edge Function lama hanya jadi cadangan bila snapshot kosong/tidak ada.
+  function withTimeout(p, ms, msg) {
+    return new Promise(function (ok, no) { var t = setTimeout(function () { no(new Error(msg)); }, ms); p.then(function (v) { clearTimeout(t); ok(v); }, function (e) { clearTimeout(t); no(e); }); });
+  }
+  function putSnap(row) {
+    var d = row.data; if (!Array.isArray(d) || new Date(row.updated_at).getFullYear() < 2000) return false;   // baris placeholder (belum pernah berhasil dihitung) diabaikan; hasil kosong yang sah tetap dipakai
+    S.an = S.an || {}; S.an[row.section] = d; S.fresh[row.section] = 1; S.snap[row.section] = row.updated_at; return true;
+  }
+  async function snapGet(keys) {
+    var q = window.scmSupabase.from('analisis_snapshot').select('section,data,updated_at').in('section', keys);
+    var r = await withTimeout(q, 10000, 'Snapshot lambat merespons.');
+    if (r.error) throw new Error(r.error.message || 'Snapshot error');
+    return r.data || [];
+  }
+  function snapAt() {   // waktu snapshot paling lama yang sedang dipakai
+    var ts = Object.keys(S.snap).map(function (k) { return S.snap[k]; }).filter(Boolean).sort();
+    return ts.length ? new Date(ts[0]).toLocaleString('id-ID', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '';
+  }
   async function secLoad(k, force) {
     if (S.anSec[k] === 'load' || (!force && S.fresh[k])) return;
     S.anSec[k] = 'load'; tstart(k); render();
     try {
-      var j = await get('/api/analisis?s=' + encodeURIComponent(k), 58000), d = j.data;
-      if (Array.isArray(d)) { var o = {}; o[k] = d; d = o; } else if (d && !Array.isArray(d[k]) && Array.isArray(d.data || d.rows)) { var o2 = {}; o2[k] = d.data || d.rows; d = o2; }
-      S.an = Object.assign(S.an || {}, d); Object.keys(d || {}).forEach(function (x) { S.fresh[x] = 1; }); S.fresh[k] = 1; S.anSec[k] = ''; S.anErr = ''; tend(k, 1);
+      // 1) jalur utama: snapshot
+      var got = false;
+      try { (await snapGet([k])).forEach(function (r) { if (putSnap(r)) got = true; }); } catch (e) { /* lanjut ke cadangan */ }
+      // 2) cadangan: Edge Function lama (hanya bila snapshot belum ada)
+      if (!got) {
+        var j = await get('/api/analisis?s=' + encodeURIComponent(k), 25000), d = j.data;
+        if (Array.isArray(d)) { var o = {}; o[k] = d; d = o; } else if (d && !Array.isArray(d[k]) && Array.isArray(d.data || d.rows)) { var o2 = {}; o2[k] = d.data || d.rows; d = o2; }
+        S.an = Object.assign(S.an || {}, d); Object.keys(d || {}).forEach(function (x) { S.fresh[x] = 1; }); S.fresh[k] = 1;
+      }
+      S.anSec[k] = ''; S.anErr = ''; tend(k, 1);
     } catch (e) { tend(k, 0); S.anSec[k] = 'err:' + e.message; }
     render();
   }
-  async function homeAn() { await Promise.all([secLoad('armada', 1), secLoad('peringatan', 1)]); }
+  // Beranda butuh armada + peringatan: satu query untuk keduanya
+  async function homeAn() {
+    var ks = ['armada', 'peringatan'];
+    ks.forEach(function (k) { S.anSec[k] = 'load'; tstart(k); });
+    var got = {};
+    try { (await snapGet(ks)).forEach(function (r) { if (putSnap(r)) got[r.section] = 1; }); } catch (e) { /* cadangan di bawah */ }
+    ks.forEach(function (k) { if (got[k]) { S.anSec[k] = ''; tend(k, 1); } });
+    render();
+    await Promise.all(ks.filter(function (k) { return !got[k]; }).map(function (k) { S.anSec[k] = ''; return secLoad(k, 1); }));
+  }
   function ens() { if (S.v === 'an' && S.sub && !S.fresh[S.sub]) secLoad(S.sub); }
   function secState(k) {
     var s = S.anSec[k] || '';
@@ -269,7 +303,7 @@
     m.fitBounds(b, { padding: [20, 20], maxZoom: 9 });
   }
   function an() {
-    var h = head('Analisis', 'Rekap & prediksi', 1);
+    var h = head('Analisis', snapAt() ? 'Data per ' + snapAt() : 'Rekap & prediksi', 1);
     h += '<div class="seg">' + SEC.map(function (t) { return '<button data-s="' + t[0] + '"' + (S.sub === t[0] ? ' class="on"' : '') + '>' + t[1] + '</button>'; }).join('') + '</div>';
     var k = S.sub, r = rows(k === 'peta' ? petaKey() : k), q, g, L; if (k === 'peta') return h + (r.length ? petaView(r) : secState('peta')); if (!r.length) return h + secState(k);
     if (k === 'armada') { q = pick('per', uq(r, 'periode')); var ra = r.filter(function (x) { return String(x.periode) === q[0]; }); return h + q[1] + tls([['Total karton', n(sum(ra, function (x) { return x.total_karton; }))], ['Total m³', n(sum(ra, function (x) { return x.total_m3; }))], ['Total ton', n(sum(ra, function (x) { return x.total_ton; }), 1)], ['Jumlah gudang', n(uq(ra, 'whs').length)]]) + armadaCharts(q[0]); }

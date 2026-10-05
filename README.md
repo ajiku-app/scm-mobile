@@ -25,3 +25,10 @@ Untuk mengaktifkan lagi: ubah ke `true`, lalu tambahkan di `login.html` sebelum 
 4. Deploy, lalu buka `https://<domain-baru>/`.
 
 Ubah `DESKTOP_URL` di bagian atas `m.js` bila alamat versi desktop berbeda.
+
+## Snapshot analisis (anti-timeout)
+Menu Analysis membaca tabel `analisis_snapshot`, bukan menghitung view berat tiap dibuka.
+1. Jalankan `sql/01_snapshot_analisis_dan_fefo.sql` di Supabase SQL Editor (sekali).
+2. Hasil dihitung ulang otomatis tiap 3 jam (pg_cron). Setelah upload data harian, bisa langsung:
+   `select * from refresh_analisis_snapshot();`
+3. Bila snapshot kosong, app otomatis memakai Edge Function lama sebagai cadangan.
