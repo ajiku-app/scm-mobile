@@ -36,6 +36,7 @@
       ['Pengiriman / hari', function (d) { return d.avg_shipment_per_day; }, function (v) { return n(v, 1); }], ['Tenaga / pengiriman', function (d) { return d.avg_crew_size; }, function (v) { return n(v, 1); }],
       ['Petugas teraktif', function (d) { return d.top_karyawan_jumlah; }, function (v) { return n(v) + 'x'; }], ['Kendaraan muat / hari', function (d) { return d.req_kendaraan_muat_per_hari; }, unit]] }
   };
+  var PAL = ['#9CC94B', '#6FB1E6', '#E8C04A', '#F29BA6', '#D14343', '#8E7CC3', '#4DB6AC', '#B0B7B2'];   // palet grafik (sebelumnya tidak terdefinisi -> layar grafik error)
   var COL = { stock: '#F29BA6', logistics: '#E8C04A', fefo: '#6FB1E6', warehouse: '#9CC94B' };
   var PICK = [['stock', 3], ['stock', 4], ['logistics', 2], ['logistics', 3], ['fefo', 1], ['warehouse', 2]];
   var SEC = [['armada', 'Armada'], ['prioritas', 'Prioritas'], ['peringatan', 'Peringatan'], ['kendaraan', 'Kendaraan'], ['prediksi', 'Prediksi'], ['stok_vs_kirim', 'Stok vs Kirim'], ['tren', 'Tren'], ['harian', 'Harian'], ['durasi_ringkas', 'Durasi truk'], ['shipments_ringkas', 'Pengiriman'], ['pareto', 'Pareto'], ['biaya_carton', 'Biaya'], ['estimasi_budget', 'Budget'], ['sku_belum_master', 'Data master'], ['peta', 'Peta']];
@@ -328,7 +329,13 @@
     return head('Profil', 'Akun & pengaturan', 1) + '<div class="card"><div class="av">' + esc((S.email[0] || 'U').toUpperCase()) + '</div><div class="sm">Masuk sebagai</div><b>' + esc(S.email || '-') + '</b></div><div class="card pf"><button data-a="reload"><span>Muat ulang data</span>' + ic('chev') + '</button><a href="' + DESKTOP_URL + '"><span>Buka versi desktop</span>' + ic('chev') + '</a><button data-a="out" class="bad"><span>Keluar</span>' + ic('chev') + '</button></div>';
   }
   function render() {
-    $('main').innerHTML = S.v === 'home' ? home() : S.v === 'an' ? an() : S.v === 'me' ? me() : detail(S.v.slice(2));
+    var html;
+    try { html = S.v === 'home' ? home() : S.v === 'an' ? an() : S.v === 'me' ? me() : detail(S.v.slice(2)); }
+    catch (e) {   // satu layar error tidak boleh membekukan menu
+      try { console.error(e); } catch (_) {}
+      html = head('Terjadi kesalahan', 'Layar gagal ditampilkan', 1) + '<div class="note"><b>Kesalahan tampilan:</b> ' + esc(e && e.message || e) + '</div><div class="card sm">Coba menu lain atau tekan tombol segarkan.</div>';
+    }
+    $('main').innerHTML = html;
     var on = function (v) { return S.v === v ? ' class="on"' : ''; };
     var NAV = [['home', 'home', 'Dashboard'], ['an', 'chart', 'Analysis'], ['z:fefo', 'clock', 'Fefo'], ['z:stock', 'box', 'Monitoring'], ['z:logistics', 'truck', 'Logistik']];
     $('nav').innerHTML = NAV.map(function (x) { return '<button data-v="' + x[0] + '"' + on(x[0]) + ' aria-label="' + x[2] + '">' + ic(x[1]) + '<span>' + x[2] + '</span></button>'; }).join('');
