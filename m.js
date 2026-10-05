@@ -1,7 +1,7 @@
 (function () {
   var DESKTOP_URL = 'https://scm-control.vercel.app/index.html'; // ganti bila alamat versi desktop berubah
   var $ = function (id) { return document.getElementById(id); };
-  var S = { v: 'home', sub: 'armada', kpi: null, an: null, anErr: '', email: '', ok: false, at: '', pk: {} }, uid = 0;
+  var S = { v: 'home', sub: 'armada', kpi: null, an: null, anErr: '', email: '', ok: false, at: '', pk: {}, anSec: {}, fresh: {} }, uid = 0;
   var P = {
     box: '<path d="M21 8l-9-5-9 5v8l9 5 9-5zM3 8l9 5 9-5M12 13v8"/>', truck: '<path d="M2 6h11v10H2zM13 10h4l3 3v3h-7zM6 19a2 2 0 1 0 0 .1M17 19a2 2 0 1 0 0 .1"/>',
     clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>', users: '<circle cx="9" cy="8" r="3"/><path d="M3 20c0-3.5 3-6 6-6s6 2.500 6 6M16 5a3 3 0 0 1 0 6M21 20c0-2.500-1.500-4.500-4-5.500"/>',
@@ -64,15 +64,37 @@
       render();
     }
   }
-  async function anLoad(t) { try { S.an = (await get('/api/analisis', 65000)).data; S.anErr = ''; } catch (e) { if (t == null) return anLoad(1); S.anErr = e.message; } render(); }
+  function rowsOf(p, k) {
+    if (Array.isArray(p)) return p; if (!p || typeof p !== 'object') return null; if (Array.isArray(p[k])) return p[k]; if (p.data) return rowsOf(p.data, k);
+    var a = Object.keys(p).filter(function (x) { return Array.isArray(p[x]); })[0]; return a ? p[a] : null;
+  }
+  // Analisis dimuat per bagian (tab), tidak sekaligus
+  async function secLoad(k, force) {
+    if (S.anSec[k] === 'load' || (!force && S.fresh[k])) return;
+    S.anSec[k] = 'load'; render();
+    try {
+      var j = await get('/api/analisis?s=' + encodeURIComponent(k), 65000), d = j.data;
+      if (Array.isArray(d)) { var o = {}; o[k] = d; d = o; } else if (d && !Array.isArray(d[k]) && Array.isArray(d.data || d.rows)) { var o2 = {}; o2[k] = d.data || d.rows; d = o2; }
+      S.an = Object.assign(S.an || {}, d); Object.keys(d || {}).forEach(function (x) { S.fresh[x] = 1; }); S.fresh[k] = 1; S.anSec[k] = ''; S.anErr = '';
+    } catch (e) { S.anSec[k] = 'err:' + e.message; }
+    render();
+  }
+  async function homeAn() { await secLoad('armada', 1); if (!S.fresh.peringatan) await secLoad('peringatan', 1); }
+  function ens() { if (S.v === 'an' && S.sub && !S.fresh[S.sub]) secLoad(S.sub); }
+  function secState(k) {
+    var s = S.anSec[k] || '';
+    if (s === 'load') return '<div class="card"><b>Memuat data…</b><div class="sm" style="margin-top:6px">Bisa sampai satu menit bila server baru bangun.</div></div>';
+    if (s.indexOf('err:') === 0) return '<div class="card"><b>Data belum bisa dimuat</b><div class="sm" style="margin:6px 0 10px">' + esc(s.slice(4)) + '</div><button class="chip" data-a="retry">Coba lagi</button></div>';
+    return '<div class="card sm">Belum ada data untuk bagian ini.</div>';
+  }
   async function load() {
-    if (S.busy) return; S.busy = 1;
+    if (S.busy) return; S.busy = 1; S.fresh = {};
     var f = document.querySelector('.fab'); if (f) f.classList.add('spin');
     try {
       await window.SCM_AUTH_READY;
       var s = await window.scmSupabase.auth.getSession();
       S.email = (s.data.session && s.data.session.user.email) || '';
-      await Promise.all(Object.keys(Z).map(function (k) { return zoneLoad(k, 1); }).concat(anLoad()));
+      await Promise.all(Object.keys(Z).map(function (k) { return zoneLoad(k, 1); }).concat(homeAn(), S.v === 'an' && S.sub !== 'armada' && S.sub !== 'peringatan' ? secLoad(S.sub, 1) : []));
       S.ok = Object.keys(Z).some(zone); S.stale = 0; S.at = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }); save();
     } catch (e) { S.ok = false; S.anErr = e.message; }
     S.busy = 0; S.last = Date.now(); render(); f = document.querySelector('.fab'); if (f) f.classList.remove('spin');
@@ -225,9 +247,8 @@
   }
   function an() {
     var h = head('Analisis', 'Rekap & prediksi', 1);
-    if (!S.an) return h + '<div class="card"><b>Data analisis belum bisa dimuat</b><div class="sm" style="margin-top:6px">' + esc(S.anErr || 'Memuat...') + '</div></div>';
     h += '<div class="seg">' + SEC.map(function (t) { return '<button data-s="' + t[0] + '"' + (S.sub === t[0] ? ' class="on"' : '') + '>' + t[1] + '</button>'; }).join('') + '</div>';
-    var k = S.sub, r = rows(k === 'peta' ? petaKey() : k), q, g, L; if (k === 'peta') return h + petaView(r); if (!r.length) return h + '<div class="card sm">Belum ada data untuk bagian ini.</div>';
+    var k = S.sub, r = rows(k === 'peta' ? petaKey() : k), q, g, L; if (k === 'peta') return h + (r.length ? petaView(r) : secState('peta')); if (!r.length) return h + secState(k);
     if (k === 'armada') { q = pick('per', uq(r, 'periode')); var ra = r.filter(function (x) { return String(x.periode) === q[0]; }); return h + q[1] + tls([['Total karton', n(sum(ra, function (x) { return x.total_karton; }))], ['Total m³', n(sum(ra, function (x) { return x.total_m3; }))], ['Total ton', n(sum(ra, function (x) { return x.total_ton; }), 1)], ['Jumlah gudang', n(uq(ra, 'whs').length)]]) + armadaCharts(q[0]); }
     if (k === 'peringatan') return h + alertDonut() + '<div class="card"><h4>Teratas</h4>' + r.slice(0, 5).map(al).join('') + '</div>';
     if (k === 'prioritas') return h + tls([['SKU prioritas', n(r.length)], ['Dampak m³', n(sum(r, function (x) { return x.dampak_m3; }))]]) + dn(r, function (x) { return x.aksi || '-'; }, 'Berdasarkan aksi') + rank(r.map(function (x) { return [x.produk || x.kode_sku, N(x.hari_cukup_prediksi)]; }), function (v) { return n(v, 1) + ' hr'; }, '#D14343', 'Stok paling cepat habis', 1);
@@ -259,9 +280,10 @@
   document.addEventListener('click', function (e) {
     var t = e.target.closest('[data-v],[data-s],[data-a],[data-p]'); if (!t) return;
     if (t.dataset.p) { var pp = t.dataset.p.split('|'); S.pk[pp[0]] = pp.slice(1).join('|'); render(); }
-    else if (t.dataset.v) { if (t.dataset.s) S.sub = t.dataset.s; S.v = t.dataset.v; render(); window.scrollTo(0, 0); }
-    else if (t.dataset.s) { S.sub = t.dataset.s; render(); }
+    else if (t.dataset.v) { if (t.dataset.s) S.sub = t.dataset.s; S.v = t.dataset.v; render(); window.scrollTo(0, 0); ens(); }
+    else if (t.dataset.s) { S.sub = t.dataset.s; render(); ens(); }
     else if (t.dataset.a === 'reload') load();
+    else if (t.dataset.a === 'retry') secLoad(S.sub, 1);
     else if (t.dataset.a === 'out') { sessionStorage.removeItem('scm_face_ok'); try { localStorage.removeItem(CK); } catch (e) {} window.scmSupabase.auth.signOut().then(function () { location.replace('/'); }); }
   });
   document.addEventListener('visibilitychange', function () { if (!document.hidden && Date.now() - (S.last || 0) > 60000) load(); });

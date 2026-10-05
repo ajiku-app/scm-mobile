@@ -43,7 +43,52 @@ module.exports = async function handler(req, res) {
     return;
   }
 
-  const url = (process.env.ANALISIS_API_URL || '').trim() || DEFAULT_URL;
+  // JALUR CEPAT: satu bagian (?s=armada, dst) dibaca langsung dari view Supabase memakai token login user
+  // (izin database tetap berlaku; bila ditolak/kosong/lambat, lanjut ke jalur Edge Function di bawah).
+  const VIEWS = {
+    armada: 'v_kebutuhan_armada_ringkas', prioritas: 'v_prioritas_tindakan', peringatan: 'v_peringatan_data',
+    kendaraan: 'v_kebutuhan_kendaraan_hari_ini', prediksi: 'v_prediksi_kirim', stok_vs_kirim: 'v_stok_vs_kirim',
+    tren: 'v_tren_bulanan', harian: 'v_harian?order=tanggal.desc&limit=60', durasi_ringkas: 'v_durasi_ringkas',
+    shipments_ringkas: 'v_shipments_ringkas', pareto: 'v_pareto', biaya_carton: 'v_biaya_per_carton_bulanan',
+    estimasi_budget: 'v_estimasi_biaya_bulan_depan', sku_belum_master: 'v_sku_belum_master', peta: 'v_peta_pelanggan',
+  };
+  const sec = req.query && req.query.s;
+  if (sec && Object.prototype.hasOwnProperty.call(VIEWS, sec)) {
+    const ac = new AbortController();
+    const tm = setTimeout(() => ac.abort(), 15000);
+    try {
+      const v = VIEWS[sec];
+      const q = v.includes('?') ? v + '&select=*' : v + '?select=*&limit=2000';
+      const tok = String(req.headers.authorization || '').replace(/^Bearer\s+/i, '').trim();
+      const r = await fetch(new URL(DEFAULT_URL).origin + '/rest/v1/' + q, {
+        headers: { apikey: resolveAnonKey(), Authorization: 'Bearer ' + tok, Accept: 'application/json' },
+        signal: ac.signal,
+      });
+      if (r.ok) {
+        const rows = await r.json();
+        if (Array.isArray(rows) && rows.length) {
+          res.setHeader('Cache-Control', 'private, no-store');
+          res.status(200).json({ ok: true, timestamp: Date.now(), via: 'view', data: { [sec]: rows } });
+          return;
+        }
+      }
+    } catch (_) {
+      /* lanjut ke jalur Edge Function */
+    } finally {
+      clearTimeout(tm);
+    }
+  }
+
+  const baseUrl = (process.env.ANALISIS_API_URL || '').trim() || DEFAULT_URL;
+  const url = baseUrl;
+  // ?s=<bagian> → panggil <base>/<bagian> (lebih ringan daripada /all); daftar dibatasi (whitelist).
+  const SECTIONS = ['armada', 'prioritas', 'peringatan', 'kendaraan', 'prediksi', 'stok_vs_kirim', 'tren', 'harian', 'durasi_ringkas', 'shipments_ringkas', 'pareto', 'biaya_carton', 'estimasi_budget', 'sku_belum_master', 'peta'];
+  const s = String((req.query && req.query.s) || '');
+  let target = url;
+  if (s) {
+    target = SECTIONS.includes(s) ? url.replace(/\/all\/?$/, '/' + s) : url;
+    if (target === url) { res.status(400).json({ ok: false, error: 'Bagian analisis tidak dikenal.' }); return; }
+  }
   if (url === DEFAULT_URL && !warnedUrl) {
     warnedUrl = true;
     console.warn(
@@ -75,7 +120,7 @@ module.exports = async function handler(req, res) {
       );
     }
 
-    const upstream = await fetch(url, { method: 'GET', headers, signal: controller.signal });
+    const upstream = await fetch(target, { method: 'GET', headers, signal: controller.signal });
     if (!upstream.ok) {
       let bodyMsg = '';
       try {
@@ -83,7 +128,7 @@ module.exports = async function handler(req, res) {
       } catch (_) {
         /* abaikan */
       }
-      if (lastGood && Date.now() - lastGood.at < STALE_MS) { res.status(200).json({ ok: true, timestamp: lastGood.at, stale: true, data: lastGood.data }); return; }
+      if (!s && lastGood && Date.now() - lastGood.at < STALE_MS) { res.status(200).json({ ok: true, timestamp: lastGood.at, stale: true, data: lastGood.data }); return; }
       res.status(502).json({
         ok: false,
         error: `Endpoint analisis merespons HTTP ${upstream.status}${bodyMsg ? ` — ${bodyMsg}` : ''}`,
@@ -92,7 +137,7 @@ module.exports = async function handler(req, res) {
     }
 
     const data = await upstream.json();
-    lastGood = { at: Date.now(), data };
+    if (!s) lastGood = { at: Date.now(), data };
     // Cache singkat di edge Vercel: data berasal dari view yang berubah per upload/shipment,
     // bukan per detik, jadi 30 detik sudah cukup segar.
     res.setHeader('Cache-Control', 's-maxage=30, stale-while-revalidate=60');
@@ -102,7 +147,7 @@ module.exports = async function handler(req, res) {
       e.name === 'AbortError'
         ? `Timeout — endpoint analisis tidak merespons dalam ${TIMEOUT_MS / 1000} detik.`
         : e.message || 'Gagal mengambil data analisis (alasan tidak diketahui).';
-    if (lastGood && Date.now() - lastGood.at < STALE_MS) { res.status(200).json({ ok: true, timestamp: lastGood.at, stale: true, data: lastGood.data }); return; }
+    if (!s && lastGood && Date.now() - lastGood.at < STALE_MS) { res.status(200).json({ ok: true, timestamp: lastGood.at, stale: true, data: lastGood.data }); return; }
     res.status(502).json({ ok: false, error: message });
   } finally {
     clearTimeout(timer);
