@@ -25,7 +25,7 @@ const { requireUser } = require('./_lib/require-user');
 
 const DEFAULT_URL =
   'https://qbougldvlmceeqceduae.supabase.co/functions/v1/analisis-scm-api/all';
-const TIMEOUT_MS = 50000;
+const TIMEOUT_MS = 38000;
 let lastGood = null; // { at, data } — cache memori per instance
 const STALE_MS = 10 * 60 * 1000;
 let warnedUrl = false;
@@ -52,10 +52,12 @@ module.exports = async function handler(req, res) {
     shipments_ringkas: 'v_shipments_ringkas', pareto: 'v_pareto', biaya_carton: 'v_biaya_per_carton_bulanan',
     estimasi_budget: 'v_estimasi_biaya_bulan_depan', sku_belum_master: 'v_sku_belum_master', peta: 'v_peta_pelanggan',
   };
+  const trace = []; // jejak penyebab lambat/gagal, ikut tampil di pesan error
+  const tr = () => (trace.length ? ' | ' + trace.join(' | ') : '');
   const sec = req.query && req.query.s;
   if (sec && Object.prototype.hasOwnProperty.call(VIEWS, sec)) {
     const ac = new AbortController();
-    const tm = setTimeout(() => ac.abort(), 15000);
+    const tm = setTimeout(() => ac.abort(), 12000);
     try {
       const v = VIEWS[sec];
       const q = v.includes('?') ? v + '&select=*' : v + '?select=*&limit=2000';
@@ -71,9 +73,14 @@ module.exports = async function handler(req, res) {
           res.status(200).json({ ok: true, timestamp: Date.now(), via: 'view', data: { [sec]: rows } });
           return;
         }
+        trace.push('view kosong');
+      } else {
+        let tx = '';
+        try { tx = (await r.text()).slice(0, 120); } catch (_) { /* abaikan */ }
+        trace.push('view HTTP ' + r.status + (tx ? ' ' + tx : ''));
       }
-    } catch (_) {
-      /* lanjut ke jalur Edge Function */
+    } catch (e) {
+      trace.push('view ' + (e.name === 'AbortError' ? 'timeout 12 dtk' : e.message));
     } finally {
       clearTimeout(tm);
     }
@@ -131,7 +138,7 @@ module.exports = async function handler(req, res) {
       if (!s && lastGood && Date.now() - lastGood.at < STALE_MS) { res.status(200).json({ ok: true, timestamp: lastGood.at, stale: true, data: lastGood.data }); return; }
       res.status(502).json({
         ok: false,
-        error: `Endpoint analisis merespons HTTP ${upstream.status}${bodyMsg ? ` — ${bodyMsg}` : ''}`,
+        error: `Endpoint analisis merespons HTTP ${upstream.status}${bodyMsg ? ` — ${bodyMsg}` : ''}${tr()}`,
       });
       return;
     }
@@ -148,7 +155,7 @@ module.exports = async function handler(req, res) {
         ? `Timeout — endpoint analisis tidak merespons dalam ${TIMEOUT_MS / 1000} detik.`
         : e.message || 'Gagal mengambil data analisis (alasan tidak diketahui).';
     if (!s && lastGood && Date.now() - lastGood.at < STALE_MS) { res.status(200).json({ ok: true, timestamp: lastGood.at, stale: true, data: lastGood.data }); return; }
-    res.status(502).json({ ok: false, error: message });
+    res.status(502).json({ ok: false, error: message + tr() });
   } finally {
     clearTimeout(timer);
   }

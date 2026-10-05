@@ -1,7 +1,7 @@
 (function () {
   var DESKTOP_URL = 'https://scm-control.vercel.app/index.html'; // ganti bila alamat versi desktop berubah
   var $ = function (id) { return document.getElementById(id); };
-  var S = { v: 'home', sub: 'armada', kpi: null, an: null, anErr: '', email: '', ok: false, at: '', pk: {}, anSec: {}, fresh: {} }, uid = 0;
+  var S = { v: 'home', sub: 'armada', kpi: null, an: null, anErr: '', email: '', ok: false, at: '', pk: {}, anSec: {}, fresh: {}, pg: {} }, uid = 0;
   var P = {
     box: '<path d="M21 8l-9-5-9 5v8l9 5 9-5zM3 8l9 5 9-5M12 13v8"/>', truck: '<path d="M2 6h11v10H2zM13 10h4l3 3v3h-7zM6 19a2 2 0 1 0 0 .1M17 19a2 2 0 1 0 0 .1"/>',
     clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>', users: '<circle cx="9" cy="8" r="3"/><path d="M3 20c0-3.5 3-6 6-6s6 2.500 6 6M16 5a3 3 0 0 1 0 6M21 20c0-2.500-1.500-4.500-4-5.500"/>',
@@ -52,14 +52,38 @@
     return j;
   }
   // tiap zona dimuat sendiri-sendiri & langsung ditampilkan begitu datang (tidak menunggu zona paling lambat)
+  // ---------- progres muat (persen + perkiraan sisa waktu, dipelajari dari durasi muat sebelumnya) ----------
+  var DK = 'scm_m_dur', DUR = {};
+  try { DUR = JSON.parse(localStorage.getItem(DK) || '{}') || {}; } catch (e) {}
+  function tstart(k) { S.pg[k] = { t0: Date.now(), exp: DUR[k] || (Z[k] ? 12000 : 15000), done: 0 }; }
+  function tend(k, ok) {
+    var p = S.pg[k]; if (!p) return; p.done = 1;
+    if (ok) { var d = Date.now() - p.t0; DUR[k] = Math.round(DUR[k] ? (DUR[k] + d) / 2 : d); try { localStorage.setItem(DK, JSON.stringify(DUR)); } catch (e) {} }
+  }
+  function pgOf(keys) {
+    var now = Date.now(), p = 0, left = 0, c = 0;
+    keys.forEach(function (k) { var t = S.pg[k]; if (!t) return; c++; if (t.done) p += 1; else { var el = now - t.t0; p += Math.min(.95, el / t.exp * .95); left = Math.max(left, (t.exp - el) / 1000); } });
+    return { p: c ? p / c : 0, left: left };
+  }
+  function pgLeft(x) { return x.p >= .95 ? 'Hampir selesai…' : x.left > 0 ? 'Perkiraan ± ' + Math.ceil(x.left) + ' detik lagi' : 'Lebih lama dari biasanya, mohon tunggu…'; }
+  function pgHtml(keys, label) {
+    var x = pgOf(keys), pc = Math.round(x.p * 100);
+    return '<div class="pgw" data-pg="' + keys.join(',') + '"><div class="pgt"><span>' + esc(label) + '</span><b>' + pc + '%</b></div><div class="pgb"><i style="width:' + pc + '%"></i></div><div class="pgl">' + pgLeft(x) + '</div></div>';
+  }
+  setInterval(function () {
+    var els = document.querySelectorAll('[data-pg]');
+    for (var i = 0; i < els.length; i++) { var x = pgOf(els[i].getAttribute('data-pg').split(',')), pc = Math.round(x.p * 100); els[i].querySelector('b').textContent = pc + '%'; els[i].querySelector('i').style.width = pc + '%'; els[i].querySelector('.pgl').textContent = pgLeft(x); }
+  }, 250);
   async function zoneLoad(k, tries) {
     S.kpi = S.kpi || { zones: {} };
+    if (tries === 1) tstart(k);
     try {
       var v = await get('/api/kpi/' + k);
-      if (v.status === 'live' && v.data) { S.kpi.zones[k] = { status: 'live', data: v.data, error: null }; render(); return; }
+      if (v.status === 'live' && v.data) { S.kpi.zones[k] = { status: 'live', data: v.data, error: null }; tend(k, 1); render(); return; }
       throw new Error(v.error || 'Gagal memuat zona');
     } catch (e) {
       if (tries > 0) { await new Promise(function (r) { setTimeout(r, 1500); }); return zoneLoad(k, tries - 1); }
+      tend(k, 0);
       if (!zone(k)) S.kpi.zones[k] = { status: 'error', data: null, error: e.message };   // data tersimpan tetap dipakai bila ada
       render();
     }
@@ -71,25 +95,24 @@
   // Analisis dimuat per bagian (tab), tidak sekaligus
   async function secLoad(k, force) {
     if (S.anSec[k] === 'load' || (!force && S.fresh[k])) return;
-    S.anSec[k] = 'load'; render();
+    S.anSec[k] = 'load'; tstart(k); render();
     try {
-      var j = await get('/api/analisis?s=' + encodeURIComponent(k), 65000), d = j.data;
+      var j = await get('/api/analisis?s=' + encodeURIComponent(k), 58000), d = j.data;
       if (Array.isArray(d)) { var o = {}; o[k] = d; d = o; } else if (d && !Array.isArray(d[k]) && Array.isArray(d.data || d.rows)) { var o2 = {}; o2[k] = d.data || d.rows; d = o2; }
-      S.an = Object.assign(S.an || {}, d); Object.keys(d || {}).forEach(function (x) { S.fresh[x] = 1; }); S.fresh[k] = 1; S.anSec[k] = ''; S.anErr = '';
-    } catch (e) { S.anSec[k] = 'err:' + e.message; }
+      S.an = Object.assign(S.an || {}, d); Object.keys(d || {}).forEach(function (x) { S.fresh[x] = 1; }); S.fresh[k] = 1; S.anSec[k] = ''; S.anErr = ''; tend(k, 1);
+    } catch (e) { tend(k, 0); S.anSec[k] = 'err:' + e.message; }
     render();
   }
-  async function homeAn() { await secLoad('armada', 1); if (!S.fresh.peringatan) await secLoad('peringatan', 1); }
+  async function homeAn() { await Promise.all([secLoad('armada', 1), secLoad('peringatan', 1)]); }
   function ens() { if (S.v === 'an' && S.sub && !S.fresh[S.sub]) secLoad(S.sub); }
   function secState(k) {
     var s = S.anSec[k] || '';
-    if (s === 'load') return '<div class="card"><b>Memuat data…</b><div class="sm" style="margin-top:6px">Bisa sampai satu menit bila server baru bangun.</div></div>';
+    if (s === 'load') return pgHtml([k], 'Memuat ' + k.replace(/_/g, ' '));
     if (s.indexOf('err:') === 0) return '<div class="card"><b>Data belum bisa dimuat</b><div class="sm" style="margin:6px 0 10px">' + esc(s.slice(4)) + '</div><button class="chip" data-a="retry">Coba lagi</button></div>';
     return '<div class="card sm">Belum ada data untuk bagian ini.</div>';
   }
   async function load() {
-    if (S.busy) return; S.busy = 1; S.fresh = {};
-    var f = document.querySelector('.fab'); if (f) f.classList.add('spin');
+    if (S.busy) return; S.busy = 1; S.fresh = {}; S.pg = {}; render();
     try {
       await window.SCM_AUTH_READY;
       var s = await window.scmSupabase.auth.getSession();
@@ -97,7 +120,7 @@
       await Promise.all(Object.keys(Z).map(function (k) { return zoneLoad(k, 1); }).concat(homeAn(), S.v === 'an' && S.sub !== 'armada' && S.sub !== 'peringatan' ? secLoad(S.sub, 1) : []));
       S.ok = Object.keys(Z).some(zone); S.stale = 0; S.at = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }); save();
     } catch (e) { S.ok = false; S.anErr = e.message; }
-    S.busy = 0; S.last = Date.now(); render(); f = document.querySelector('.fab'); if (f) f.classList.remove('spin');
+    S.busy = 0; S.last = Date.now(); render();
   }
 
   function status() { return '<span class="chip"><span class="dot' + (S.ok ? '' : ' err') + '"></span>' + (S.ok ? 'Online' : 'Offline') + '</span>'; }
@@ -108,7 +131,7 @@
   }
   function head(title, sub, back) {
     var cnt = S.an && S.an.peringatan ? S.an.peringatan.length : 0;
-    return '<div class="hd"><button class="rb" data-v="' + (back ? 'home' : 'an') + '" data-s="' + (back ? '' : 'peringatan') + '" aria-label="' + (back ? 'Kembali' : 'Peringatan') + '">' + ic(back ? 'back' : 'bell') + (!back && cnt ? '<i>' + Math.min(99, cnt) + '</i>' : '') + '</button><div class="t"><b>' + title + '</b><small>' + sub + '</small></div><button class="rb" data-v="me" aria-label="Profil">' + ic('user') + '</button></div>';
+    return '<div class="hd"><button class="rb" data-v="' + (back ? 'home' : 'an') + '" data-s="' + (back ? '' : 'peringatan') + '" aria-label="' + (back ? 'Kembali' : 'Peringatan') + '">' + ic(back ? 'back' : 'bell') + (!back && cnt ? '<i>' + Math.min(99, cnt) + '</i>' : '') + '</button><div class="t"><b>' + title + '</b><small>' + sub + '</small></div><div class="rg"><button class="rb rl' + (S.busy ? ' spin' : '') + '" data-a="reload" aria-label="Segarkan">' + ic('ref') + '</button><button class="rb" data-v="me" aria-label="Profil">' + ic('user') + '</button></div></div>';
   }
   function tile(label, val) { return '<div class="tl"><small>' + esc(label) + '</small><b>' + esc(val) + '</b></div>'; }
   function tiles(k) {
@@ -184,7 +207,7 @@
     var vs = ['stock', 'logistics', 'fefo'].map(function (k) { var d = zone(k); return d ? Number(Z[k].main(d)) : NaN; }).filter(isFinite);
     var sc = vs.length ? vs.reduce(function (a, b) { return a + b; }, 0) / vs.length : NaN, al4 = (S.an && S.an.peringatan || []).slice(0, 4);
     return head('SCM Tower', S.at ? (S.stale ? 'Data tersimpan ' : 'Disinkron pukul ') + S.at : 'Memuat data...') +
-      '<div class="chips"><span class="chip">Hari ini</span>' + status() + '<span class="chip good">' + esc(S.email.split('@')[0] || 'pengguna') + '</span></div>' +
+      (S.busy ? pgHtml(['stock', 'logistics', 'fefo', 'warehouse', 'armada', 'peringatan'], 'Memuat data') : '') + '<div class="chips"><span class="chip">Hari ini</span>' + status() + '<span class="chip good">' + esc(S.email.split('@')[0] || 'pengguna') + '</span></div>' +
       '<div class="hero"><div><div class="lb">Skor operasional</div><div class="big">' + (isFinite(sc) ? Math.round(sc) : '-') + '<small>%</small></div><p>' + (isFinite(sc) ? lbl(sc) + ' · dari ' + vs.length + ' dari 3 indikator' : 'Menunggu data') + '</p></div>' + gauge(sc, '#14201A') + '</div>' + errNote() +
       '<div class="card"><h4>Zona operasional</h4>' + Object.keys(Z).map(function (k) {
         var d = zone(k), v = d ? Number(Z[k].main(d)) : NaN, ok = isFinite(v);
@@ -273,7 +296,8 @@
   function render() {
     $('main').innerHTML = S.v === 'home' ? home() : S.v === 'an' ? an() : S.v === 'me' ? me() : detail(S.v.slice(2));
     var on = function (v) { return S.v === v ? ' class="on"' : ''; };
-    $('nav').innerHTML = '<button data-v="home"' + on('home') + ' aria-label="Beranda">' + ic('home') + '</button><button data-v="an"' + on('an') + ' aria-label="Analisis">' + ic('chart') + '</button><button class="fab" data-a="reload" aria-label="Segarkan">' + ic('ref') + '</button><button data-v="z:logistics"' + on('z:logistics') + ' aria-label="Logistik">' + ic('truck') + '</button><button data-v="me"' + on('me') + ' aria-label="Profil">' + ic('user') + '</button>';
+    var NAV = [['home', 'home', 'Dashboard'], ['an', 'chart', 'Analysis'], ['z:fefo', 'clock', 'Fefo'], ['z:stock', 'box', 'Monitoring'], ['z:logistics', 'truck', 'Logistik']];
+    $('nav').innerHTML = NAV.map(function (x) { return '<button data-v="' + x[0] + '"' + on(x[0]) + ' aria-label="' + x[2] + '">' + ic(x[1]) + '<span>' + x[2] + '</span></button>'; }).join('');
     var c = document.querySelector('.seg .on'); if (c && c.scrollIntoView) c.scrollIntoView({ inline: 'center', block: 'nearest' });
     initMap();
   }
