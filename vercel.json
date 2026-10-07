@@ -7,6 +7,9 @@
     "api/analisis.js": {
       "maxDuration": 60
     },
+    "api/stok.js": {
+      "maxDuration": 60
+    },
     "api/kpi/[zone].js": {
       "maxDuration": 30
     }

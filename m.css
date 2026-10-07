@@ -201,3 +201,4 @@ body{background:radial-gradient(520px 360px at 85% -60px,rgba(46,60,230,.35),tra
 .an p b{font-weight:700}.an .r{color:#FF6B8A}.an .o{color:#FFB020}.an .g{color:#B6B9D2}.an .b{color:#7C9BFF}
 .lgd{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:11.5px;color:var(--m);margin-bottom:8px}.lgd span{display:inline-flex;align-items:center;gap:6px}.lgd i{width:9px;height:9px;display:inline-block}
 .rg2{display:flex;justify-content:space-between;gap:10px;font-size:12px;margin-top:6px}
+.src{margin:-4px 4px 14px;line-height:1.5;word-break:break-word}.src b{color:var(--ink)}

@@ -105,7 +105,13 @@
     render();
   }
   async function homeAn() { await Promise.all([secLoad('armada', 1), secLoad('peringatan', 1)]); }
-  function ens() { if (S.v === 'an' && S.sub && !S.fresh[S.sub]) secLoad(S.sub); else if (S.v === 'z:stock' && !S.fresh.stok_vs_kirim) secLoad('stok_vs_kirim'); }
+  async function stkLoad(force) {
+    if (S.stkSt === 'load' || (!force && S.stk)) return;
+    S.stkSt = 'load'; render();
+    try { S.stk = await get('/api/stok', 58000); S.stkSt = ''; } catch (e) { S.stk = null; S.stkSt = 'err:' + e.message; }
+    render();
+  }
+  function ens() { if (S.v === 'an' && S.sub && !S.fresh[S.sub]) secLoad(S.sub); else if (S.v === 'z:stock') { if (!S.stk && S.stkSt !== 'load') stkLoad(); if (!S.fresh.stok_vs_kirim) secLoad('stok_vs_kirim'); } }
   function secState(k) {
     var s = S.anSec[k] || '';
     if (s === 'load') return pgHtml([k], 'Memuat ' + k.replace(/_/g, ' '));
@@ -118,7 +124,7 @@
       await window.SCM_AUTH_READY;
       var s = await window.scmSupabase.auth.getSession();
       S.email = (s.data.session && s.data.session.user.email) || '';
-      await Promise.all(Object.keys(Z).map(function (k) { return zoneLoad(k, 1); }).concat(homeAn(), S.v === 'an' && S.sub !== 'armada' && S.sub !== 'peringatan' ? secLoad(S.sub, 1) : [], S.v === 'z:stock' ? secLoad('stok_vs_kirim', 1) : []));
+      await Promise.all(Object.keys(Z).map(function (k) { return zoneLoad(k, 1); }).concat(homeAn(), S.v === 'an' && S.sub !== 'armada' && S.sub !== 'peringatan' ? secLoad(S.sub, 1) : [], S.v === 'z:stock' ? [secLoad('stok_vs_kirim', 1), stkLoad(1)] : []));
       S.ok = Object.keys(Z).some(zone); S.stale = 0; S.at = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }); save();
     } catch (e) { S.ok = false; S.anErr = e.message; }
     S.busy = 0; S.last = Date.now(); render();
@@ -236,37 +242,83 @@
     var up = dl > 0, ch = isFinite(dl) ? '<span class="dl ' + (up ? 'up' : 'dn') + '">' + (up ? '▲' : '▼') + ' ' + n(Math.abs(dl), 1) + '%</span>' : '';
     return '<div class="kp ' + (extra || '') + '" style="--kc:' + c + '"><div class="kh"><small>' + esc(label) + '</small>' + ch + '</div><b>' + val + '</b>' + (sub ? '<span>' + sub + '</span>' : '') + '</div>';
   }
-  function stockKpis(d, r) {
-    var NOT = /pct|persen|delta|change|chg|trend/, tot = d.total_stock_unit, dv = fz(d, [/deliver.*(today|hari)/, /(today|hari).*deliver/, /^delivery/, /kirim.*(hari_?ini|today)/], NOT),
-      av = fz(d, [/available|tersedia/], /pct|delta|change|chg|sku/), pl = fz(d, [/planning.*prod|prod.*planning/, /planning/, /rencana.*prod/], NOT),
-      pa = fz(d, [/total.*pallet|pallet.*total/, /pallet/], /kapasitas|capacity|cap_|belum|missing|tanpa|no_|pct|util|sku/), nopa = fz(d, [/(belum|missing|tanpa|no).*(pallet|qty)/, /pallet.*(belum|missing|none|tanpa)/]),
-      dy = fz(d, [/ketahanan|stock_?days|days_?cover|cover.*days|hari_?stok|stok_?hari/], /sku|kritis|idle|critical/), cr = fz(d, [/kritis|critical/], /pct/), id = fz(d, [/idle/], /pct/),
-      cv = fz(d, [/(forecast|akurasi).*(sku|cover|tercakup)/, /sku.*(cover|tercakup|forecast)/], /pct/);
-    if (!isFinite(av) && r.length) { var sa = sum(r, function (x) { return x.stok_available; }); if (isFinite(sa)) av = sa; }
+  // ---------- hitung KPI dari TABEL STOK ----------
+  function colOf(rows, res, not, text) {
+    var ks = {}, i, j; rows.slice(0, 40).forEach(function (r) { Object.keys(r).forEach(function (k) { ks[k] = 1; }); }); ks = Object.keys(ks);
+    for (i = 0; i < res.length; i++) for (j = 0; j < ks.length; j++) {
+      if (!res[i].test(ks[j]) || (not && not.test(ks[j]))) continue;
+      if (text || rows.slice(0, 80).some(function (r) { return r[ks[j]] !== '' && r[ks[j]] != null && isFinite(Number(r[ks[j]])); })) return ks[j];
+    }
+    return null;
+  }
+  function tblCalc(st) {
+    var rows = st && st.rows; if (!rows || !rows.length) return null;
+    var NT = /tanggal|date|status|pct|persen|id$/i, c = {
+      sku: colOf(rows, [/^(kode_?sku|sku_?code|sku|kode_?produk|material(_?code)?|kode_?barang|item_?code|kode)$/i], null, 1),
+      s: colOf(rows, [/^(stok_hari_ini|stock_today|stok_akhir|total_stok|stok|stock|qty_stok|qty_stock|on_hand|qty)$/i, /stok|stock/i], /pallet|available|tersedia|min|max|safety|kode|status|kelas|hari|days|komit|id$/i),
+      d: colOf(rows, [/deliver|kirim|shipment|komitmen|outbound/i], /tanggal|date|status|pct|hari_cukup|id$/i),
+      p: colOf(rows, [/planning|plan_?prod|rencana|produksi/i], NT), a: colOf(rows, [/available|tersedia/i], NT),
+      q: colOf(rows, [/(qty|isi|per|konversi).*pallet|pallet.*(qty|isi|per|konversi|capacity)/i], /status|id$/i),
+      pl: colOf(rows, [/^(total_)?pallets?$|jumlah_pallet|pallet_count|^pallet_/i], /status|id$/i), h: colOf(rows, [/hari_cukup|days_?cover|ketahanan|stock_?days|cover_?days/i], /status|id$/i),
+      k: colOf(rows, [/total_kebutuhan|kebutuhan/i], NT), st: colOf(rows, [/^(status|status_stok|kondisi)$/i], null, 1)
+    };
+    if (!c.s) return { st: st, c: c, rows: rows, items: [], k: {} };
+    var m = {}, items = [], N = function (v) { v = Number(v); return isFinite(v) ? v : 0; };
+    rows.forEach(function (r, i) {
+      var key = c.sku ? String(r[c.sku]) : '#' + i, o = m[key] || (m[key] = { name: c.sku ? key : 'Baris ' + (i + 1), s: 0, d: 0, p: 0, a: 0, k: 0, q: NaN, h: NaN, pl: 0, st: '', ha: 0 });
+      o.s += N(r[c.s]); if (c.d) o.d += N(r[c.d]); if (c.p) o.p += N(r[c.p]); if (c.a) o.a += N(r[c.a]); if (c.k) o.k += N(r[c.k]); if (c.pl) o.pl += N(r[c.pl]);
+      if (c.q && Number(r[c.q]) > 0) o.q = Number(r[c.q]); if (c.h && isFinite(Number(r[c.h])) && r[c.h] !== '' && r[c.h] != null) o.h = isFinite(o.h) ? Math.min(o.h, Number(r[c.h])) : Number(r[c.h]); if (c.st && r[c.st]) o.st = String(r[c.st]);
+    });
+    Object.keys(m).forEach(function (k) { var o = m[k]; o.y = c.k ? o.k : (c.d || c.p) ? o.d + o.p : NaN; items.push(o); });
+    var tot = sum(items, function (o) { return o.s; }), dv = c.d ? sum(items, function (o) { return o.d; }) : NaN, pl = c.p ? sum(items, function (o) { return o.p; }) : NaN,
+      av = c.a ? sum(items, function (o) { return o.a; }) : isFinite(dv) ? tot - dv : NaN,
+      pa = c.pl ? sum(items, function (o) { return o.pl; }) : c.q ? sum(items, function (o) { return o.q > 0 ? o.s / o.q : 0; }) : NaN,
+      nopa = c.q ? items.filter(function (o) { return o.s > 0 && !(o.q > 0); }).length : NaN, hs = items.filter(function (o) { return isFinite(o.h) && o.s > 0; }),
+      dy = hs.length ? sum(hs, function (o) { return o.h; }) / hs.length : isFinite(dv) && dv > 0 ? tot / dv : NaN,
+      cr = c.h ? items.filter(function (o) { return isFinite(o.h) && o.h <= 3 && o.s > 0; }).length : c.st ? items.filter(function (o) { return /krit|kurang|habis|shortage/i.test(o.st); }).length : NaN,
+      id = c.d || c.p ? items.filter(function (o) { return o.s > 0 && !o.d && !o.p; }).length : NaN;
+    return { st: st, c: c, rows: rows, items: items, k: { tot: tot, dv: dv, av: av, pl: pl, pa: pa, nopa: nopa, dy: dy, cr: cr, id: id } };
+  }
+  function srcNote(T) {
+    if (S.stkSt === 'load') return '<div class="sm src">Memuat tabel stok…</div>';
+    if (S.stkSt && S.stkSt.indexOf('err:') === 0) return '<div class="note" style="margin:0 0 12px"><b>Tabel stok belum bisa dibaca.</b><div style="margin:4px 0 8px">' + esc(S.stkSt.slice(4)) + '</div><button class="chip" data-a="stk">Coba lagi</button></div>';
+    if (!T) return '';
+    var c = T.c, u = Object.keys(c).filter(function (k) { return c[k]; }).map(function (k) { return k + '=' + c[k]; }).join(', ');
+    return '<div class="sm src">Sumber: tabel <b>' + esc(T.st.table) + '</b> · ' + n(T.rows.length) + ' baris' + (T.st.truncated ? ' (dibatasi 8.000)' : '') + (T.items.length ? ' · ' + n(T.items.length) + ' SKU' : '') + '<br>Kolom terpakai: ' + esc(u || 'tidak ada yang cocok') + '<br>Semua kolom: ' + esc(T.st.cols.join(', ')) + '</div>';
+  }
+  function stockKpis(d, T) {
+    var NOT = /pct|persen|delta|change|chg|trend/, k = T ? T.k : {}, pick = function (a, b) { return isFinite(a) ? a : b; },
+      tot = pick(k.tot, Number(d.total_stock_unit)), dv = pick(k.dv, fz(d, [/deliver.*(today|hari)/, /(today|hari).*deliver/, /^delivery/, /kirim.*(hari_?ini|today)/], NOT)),
+      av = pick(k.av, fz(d, [/available|tersedia/], /pct|delta|change|chg|sku/)), pl = pick(k.pl, fz(d, [/planning.*prod|prod.*planning/, /planning/, /rencana.*prod/], NOT)),
+      pa = pick(k.pa, fz(d, [/total.*pallet|pallet.*total/, /pallet/], /kapasitas|capacity|cap_|belum|missing|tanpa|no_|pct|util|sku/)), nopa = pick(k.nopa, fz(d, [/(belum|missing|tanpa|no).*(pallet|qty)/, /pallet.*(belum|missing|none|tanpa)/])),
+      dy = pick(k.dy, fz(d, [/ketahanan|stock_?days|days_?cover|cover.*days|hari_?stok|stok_?hari/], /sku|kritis|idle|critical/)), cr = pick(k.cr, fz(d, [/kritis|critical/], /pct/)), id = pick(k.id, fz(d, [/idle/], /pct/)),
+      cv = fz(d, [/(forecast|akurasi).*(sku|cover|tercakup)/, /sku.*(cover|tercakup|forecast)/], /pct/), nSku = T && T.items.length ? T.items.length : Number(d.total_sku);
     var cards = [
       kpCard('#1FB6A6', 'Total Stok Hari Ini', n(tot), 'unit pack/sct/tin', dlt(d, 'stock|stok')),
       kpCard('#2FBF8A', 'Delivery Hari Ini', n(dv), 'kirim terjadwal hari ini', dlt(d, 'deliver|kirim')),
-      kpCard('#FF5C6C', 'Forecast Accuracy', isFinite(Number(d.forecast_accuracy_pct)) ? pct(d.forecast_accuracy_pct) : '-', isFinite(cv) && isFinite(Number(d.total_sku)) ? n(cv) + ' dari ' + n(d.total_sku) + ' SKU tercakup' : '', dlt(d, 'forecast|akurasi')),
+      kpCard('#FF5C6C', 'Forecast Accuracy', isFinite(Number(d.forecast_accuracy_pct)) ? pct(d.forecast_accuracy_pct) : '-', isFinite(cv) && isFinite(nSku) ? n(cv) + ' dari ' + n(nSku) + ' SKU tercakup' : '', dlt(d, 'forecast|akurasi')),
       kpCard('#4F7BFF', 'Stok Available', n(av), 'setelah komitmen kirim', dlt(d, 'available|tersedia')),
       kpCard('#9A86FF', 'Total Planning Produksi', n(pl), 'kebutuhan produksi', dlt(d, 'planning')),
       kpCard('#FFB020', 'Total Pallet', isFinite(pa) ? n(pa) + '<em> pallet</em>' : '-', isFinite(nopa) && nopa > 0 ? n(nopa) + ' SKU belum ada data qty/pallet' : '', dlt(d, 'pallet')),
       kpCard('#1FB6A6', 'Hari Ketahanan Stok', isFinite(dy) ? n(dy, 1) + '<em> hari</em>' : '-', (isFinite(cr) ? n(cr) + ' Kritis' : '') + (isFinite(cr) && isFinite(id) ? ' · ' : '') + (isFinite(id) ? n(id) + ' SKU idle' : ''), dlt(d, 'ketahanan|days|hari'), 'wide')
     ];
-    var miss = [tot, dv, av, pl, pa, dy].filter(function (x) { return !isFinite(Number(x)); }).length;
-    return '<div class="kps">' + cards.join('') + '</div>' + (miss ? '<div class="sm" style="margin:-4px 4px 14px">' + miss + ' KPI belum ditemukan di data API. Kolom tersedia: ' + esc(Object.keys(d).join(', ')) + '</div>' : '');
+    return '<div class="kps">' + cards.join('') + '</div>' + srcNote(T);
   }
-  function skuName(x) { return String(x.kode_sku || x.sku || x.produk || x.nama || x.kode || '-'); }
-  function stockAnalysis(d, r) {
-    var pa = fz(d, [/total.*pallet|pallet.*total/, /pallet/], /kapasitas|capacity|cap_|belum|missing|tanpa|no_|pct|util|sku/), u = Number(d.capacity_util_pct), cap = isFinite(pa) && u > 0 ? pa / (u / 100) : NaN;
-    var by = function (re) { return r.filter(function (x) { return re.test(String(x.status || '')); }); }, nm = function (a) { return a.slice(0, 4).map(skuName).join(', ') + (a.length > 4 ? ', dll' : ''); };
-    var th = by(/menipis|tipis|low|kurang/i), id = by(/idle|tanpa|slow/i), safe = Number(d.safe_sku), ts = Number(d.total_sku), hp = Number(d.health_pct), cond = r.length ? '' : ' (data per SKU belum dimuat)';
+  function stockAnalysis(d, T) {
+    var k = T ? T.k : {}, pa = isFinite(k.pa) ? k.pa : fz(d, [/total.*pallet|pallet.*total/, /pallet/], /kapasitas|capacity|cap_|belum|missing|tanpa|no_|pct|util|sku/), u = Number(d.capacity_util_pct), cap = isFinite(pa) && u > 0 ? pa / (u / 100) : NaN,
+      it = T ? T.items : [], has = it.some(function (o) { return isFinite(o.y); }), nm = function (a) { return a.slice(0, 4).map(function (o) { return o.name; }).join(', ') + (a.length > 4 ? ', dll' : ''); };
+    var idl = has ? it.filter(function (o) { return o.s > 0 && !(o.y > 0); }) : it.filter(function (o) { return /idle|tanpa|slow/i.test(o.st); }),
+      th = has ? it.filter(function (o) { return o.s > 0 && o.y > 0 && o.y / o.s > 0.7; }) : it.filter(function (o) { return /menipis|tipis|low|kurang/i.test(o.st); }),
+      safe = Number(d.safe_sku), ts = Number(d.total_sku), hp = Number(d.health_pct);
     var b1 = isFinite(u) ? (isFinite(pa) ? 'Total stok saat ini membutuhkan ≈ <b class="r">' + n(pa) + ' pallet</b>' + (isFinite(cap) ? ' dari kapasitas gudang FG ' + n(cap) + ' pallet' : '') + ' (<b class="r">' + n(u, 1) + '% terpakai</b>). ' : 'Utilisasi kapasitas gudang <b class="r">' + n(u, 1) + '%</b>. ') + (u >= 100 ? 'Kapasitas gudang sudah terlampaui — pertimbangkan relokasi atau pengiriman segera.' : u >= 85 ? 'Kapasitas gudang mendekati penuh — pantau pengiriman berikutnya.' : 'Kapasitas gudang masih memadai.') : 'Data kapasitas belum tersedia.';
-    var b2 = r.length ? (th.length ? '<b class="o">' + n(th.length) + ' item</b> mendekati batas kebutuhan: ' + esc(nm(th)) + '. Perlu dipantau untuk pengiriman berikutnya.' : 'Tidak ada SKU yang mendekati batas kebutuhan.') : 'Memuat data per SKU…';
-    var b3 = r.length ? (id.length ? '<b class="g">' + n(id.length) + ' item</b> tidak punya rencana delivery maupun planning — berpotensi slow-moving atau mendekati kedaluwarsa: ' + esc(nm(id)) + '.' : 'Tidak ada SKU idle.') : 'Memuat data per SKU…';
+    var wait = !it.length ? (S.stkSt === 'load' ? 'Memuat tabel stok…' : 'Data per SKU belum tersedia.') : '';
+    var b2 = wait || (th.length ? '<b class="o">' + n(th.length) + ' item</b> mendekati batas kebutuhan: ' + esc(nm(th)) + '. Perlu dipantau untuk pengiriman berikutnya.' : 'Tidak ada SKU yang mendekati batas kebutuhan.');
+    var b3 = wait || (idl.length ? '<b class="g">' + n(idl.length) + ' item</b> tidak punya rencana delivery maupun planning — berpotensi slow-moving atau mendekati kedaluwarsa: ' + esc(nm(idl)) + '.' : 'Tidak ada SKU idle.');
     var b4 = isFinite(safe) && isFinite(ts) ? '<b class="b">' + n(safe) + ' dari ' + n(ts) + ' SKU' + (isFinite(hp) ? ' (' + n(hp, 1) + '%)' : '') + '</b> dalam kondisi Aman. <b class="b">' + n(ts - safe) + ' item</b> memerlukan perhatian (gabungan kekurangan, menipis, dan idle) — prioritaskan berdasarkan urgensi gap dan tanggal pengiriman.' : 'Data kesehatan stok belum tersedia.';
     var bl = function (c, t, h) { return '<div class="an" style="--ac:' + c + '"><b>' + t + '</b><p>' + h + '</p></div>'; };
     return '<div class="card"><h4>Analisa System</h4>' + bl('#FF5C6C', 'Kapasitas gudang vs kebutuhan pallet', b1) + bl('#FFB020', 'Stok menipis (utilisasi &gt; 70%)', b2) + bl('#8E93B8', 'Stok idle / tanpa permintaan', b3) + bl('#4F7BFF', 'Kesehatan stok keseluruhan', b4) + '</div>';
   }
+  function skuName(x) { return String(x.kode_sku || x.sku || x.produk || x.nama || x.kode || '-'); }
   function kfmt(v) { var a = Math.abs(v); return a >= 1000 ? (Math.round(v / 100) / 10) + 'k' : String(Math.round(v)); }
   function regress(pts) {
     var m = pts.length, sx = 0, sy = 0, i; if (m < 3) return null;
@@ -279,12 +331,16 @@
     return { a: a, b: b, r2: syy ? 1 - ss / syy : 0, sd: Math.sqrt(ss / m), res: res };
   }
   function pickKey(x0, res) { var ks = Object.keys(x0 || {}); for (var i = 0; i < res.length; i++) for (var j = 0; j < ks.length; j++) if (res[i].test(ks[j]) && isFinite(Number(x0[ks[j]]))) return ks[j]; return null; }
-  function scatter(r) {
+  function scatter(T, r) {
     var head4 = '<div class="card"><h4>Deteksi SKU Outlier — Stok vs Kebutuhan</h4><div class="sm" style="margin:-6px 0 12px">Korelasi seluruh SKU antara stok dan total kebutuhan, dengan regresi linear untuk mendeteksi item slow-moving/overstock.</div>';
-    if (!r.length) return head4 + '<div class="sm">' + (S.anSec.stok_vs_kirim === 'load' ? 'Memuat data per SKU…' : 'Data per SKU belum tersedia.') + '</div></div>';
-    var kx = pickKey(r[0], [/^stok_hari_ini$/, /^stok$/, /^stock$/, /stok.*hari_?ini/, /^stok_available$/, /stok|stock/]), ky = pickKey(r[0], [/^total_kebutuhan$/, /kebutuhan/, /total.*(kirim|plan|demand)/, /demand/, /kirim/]);
-    if (!kx || !ky || kx === ky) return head4 + '<div class="note" style="margin:0">Kolom stok / kebutuhan belum ditemukan di data per SKU. Kolom tersedia: ' + esc(Object.keys(r[0]).join(', ')) + '</div></div>';
-    var P = r.map(function (x) { return [Number(x[kx]), Number(x[ky]), skuName(x)]; }).filter(function (p) { return isFinite(p[0]) && isFinite(p[1]); }).slice(0, 500), g = regress(P);
+    var P = [], from = '';
+    if (T && T.items.some(function (o) { return isFinite(o.y); })) { P = T.items.filter(function (o) { return isFinite(o.y); }).map(function (o) { return [o.s, o.y, o.name]; }).slice(0, 500); from = 'tabel stok'; }
+    else if (r.length) {
+      var kx = pickKey(r[0], [/^stok_hari_ini$/, /^stok$/, /^stock$/, /stok.*hari_?ini/, /^stok_available$/, /stok|stock/]), ky = pickKey(r[0], [/^total_kebutuhan$/, /kebutuhan/, /total.*(kirim|plan|demand)/, /demand/, /kirim/]);
+      if (kx && ky && kx !== ky) { P = r.map(function (x) { return [Number(x[kx]), Number(x[ky]), skuName(x)]; }).filter(function (p) { return isFinite(p[0]) && isFinite(p[1]); }).slice(0, 500); from = 'stok_vs_kirim'; }
+    }
+    if (!P.length) return head4 + '<div class="sm">' + (S.stkSt === 'load' ? 'Memuat tabel stok…' : 'Kolom stok / kebutuhan belum ditemukan' + (T ? ' di tabel ' + esc(T.st.table) + ' (lihat daftar kolom di atas)' : '') + '.') + '</div></div>';
+    var g = regress(P);
     if (!g) return head4 + '<div class="sm">Data belum cukup untuk regresi.</div></div>';
     var W = 340, H = 250, L = 38, R = 10, T = 10, B = 34, xmx = Math.max.apply(0, P.map(function (p) { return p[0]; })) * 1.08 || 1, ymx = Math.max.apply(0, P.map(function (p) { return p[1]; })) * 1.12 || 1, ymn = Math.min(0, Math.min.apply(0, P.map(function (p) { return p[1]; })));
     var X = function (v) { return L + v / xmx * (W - L - R); }, Y = function (v) { return T + (1 - (v - ymn) / (ymx - ymn)) * (H - T - B); }, o = '', i, t;
@@ -302,11 +358,11 @@
     var d = zone(k), z = Z[k];
     if (!d) return head(z.t, z.s, 1) + '<div class="note">' + esc(zerr(k) || 'Data zona ini belum tersedia.') + '</div><div class="card sm">Tekan tombol segarkan di tengah untuk mencoba lagi.</div>';
     var v = Number(z.main(d)), g = zoneCharts(k, d, z, COL[k]), c = z.raw ? 'warn' : cls(v);
-    var isS = k === 'stock', its = z.k.map(function (x) { var y = x[1](d); return y == null || !isFinite(Number(y)) ? null : [x[0], x[2](y, d)]; }).filter(Boolean), tri = isS ? [] : its.slice(1, 4), rest = isS ? [] : its.slice(4), sr = isS ? rows('stok_vs_kirim') : [];
+    var isS = k === 'stock', T = isS ? tblCalc(S.stk) : null, its = z.k.map(function (x) { var y = x[1](d); return y == null || !isFinite(Number(y)) ? null : [x[0], x[2](y, d)]; }).filter(Boolean), tri = isS ? [] : its.slice(1, 4), rest = isS ? [] : its.slice(4), sr = isS ? rows('stok_vs_kirim') : [];
     return head(z.t, z.s, 1) +
       '<div class="dp"><div class="dr"><span class="zi">' + ic(z.i) + '</span><div class="dk"><small>' + z.s + '</small><b>' + n(v, 1) + (z.raw ? '/hari' : '%') + '</b><small>' + z.t + '</small></div></div>' +
       '<div class="ds"><small>Status:</small><span class="pill ' + c + '">' + (z.raw ? 'Aktif' : lbl(v)) + '</span></div><button class="fb" data-a="reload" aria-label="Segarkan">' + ic('ref') + '</button></div>' +
-      (isS ? stockKpis(d, sr) + stockAnalysis(d, sr) + scatter(sr) : '') +
+      (isS ? stockKpis(d, T) + stockAnalysis(d, T) + scatter(T, sr) : '') +
       (tri.length ? '<div class="tri">' + tri.map(function (x) { return '<div><small>' + esc(x[0]) + '</small><b>' + esc(x[1]) + '</b></div>'; }).join('') + '</div>' : '') +
       (rest.length ? '<div class="tb"><div class="tbh"><span>Indikator</span><span>Nilai</span></div>' + rest.map(function (x) { return '<div class="tbr"><span>' + esc(x[0]) + '</span><b>' + esc(x[1]) + '</b></div>'; }).join('') + '</div>' : '') +
       g;
@@ -405,6 +461,7 @@
     else if (t.dataset.s) { S.sub = t.dataset.s; render(); ens(); }
     else if (t.dataset.a === 'reload') load();
     else if (t.dataset.a === 'retry') secLoad(S.sub, 1);
+    else if (t.dataset.a === 'stk') stkLoad(1);
     else if (t.dataset.a === 'out') { sessionStorage.removeItem('scm_face_ok'); try { localStorage.removeItem(CK); } catch (e) {} window.scmSupabase.auth.signOut().then(function () { location.replace('/'); }); }
   });
   document.addEventListener('visibilitychange', function () { if (!document.hidden && Date.now() - (S.last || 0) > 60000) load(); });
