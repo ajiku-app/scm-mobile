@@ -134,7 +134,10 @@
     var cnt = S.an && S.an.peringatan ? S.an.peringatan.length : 0;
     return '<div class="hd"><button class="rb" data-v="' + (back ? 'home' : 'an') + '" data-s="' + (back ? '' : 'peringatan') + '" aria-label="' + (back ? 'Kembali' : 'Peringatan') + '">' + ic(back ? 'back' : 'bell') + (!back && cnt ? '<i>' + Math.min(99, cnt) + '</i>' : '') + '</button><div class="t"><b>' + title + '</b><small>' + sub + '</small></div><div class="rg"><button class="rb rl' + (S.busy ? ' spin' : '') + '" data-a="reload" aria-label="Segarkan">' + ic('ref') + '</button><button class="rb" data-v="me" aria-label="Profil">' + ic('user') + '</button></div></div>';
   }
-  function tile(label, val) { return '<div class="tl"><small>' + esc(label) + '</small><b>' + esc(val) + '</b></div>'; }
+  function tile(label, val) {
+    var m = String(val).match(/^(-?[\d.,]+)\s*(%|unit|ctn|jt ctn|m³|hr|mnt|\/hari|x)$/);
+    return '<div class="tl"><small>' + esc(label) + '</small><b>' + (m ? esc(m[1]) + '<em>' + esc(m[2]) + '</em>' : esc(val)) + '</b></div>';
+  }
   function tiles(k) {
     var d = zone(k); if (!d) return '';
     return Z[k].k.map(function (x) { var v = x[1](d); return v == null || !isFinite(Number(v)) ? '' : tile(x[0], x[2](v, d)); }).join('');
@@ -270,6 +273,12 @@
     m.fitBounds(b, { padding: [20, 20], maxZoom: 9 });
   }
   function an() {
+    var s = anBody(), P1 = '<select class="dd" data-sk', i = s.indexOf(P1); if (i < 0) return s;
+    var j = s.indexOf('</select>', i) + 9, e = s.indexOf('</select>', j) + 9;
+    if (s.indexOf('<select class="dd" data-pk', j) === j && e > j) return s.slice(0, i) + '<div class="ddrow">' + s.slice(i, e) + '</div>' + s.slice(e);
+    return s.slice(0, i) + '<div class="ddrow">' + s.slice(i, j) + '</div>' + s.slice(j);
+  }
+  function anBody() {
     var h = head('Analisis', 'Rekap & prediksi', 1);
     h += '<select class="dd" data-sk="1" aria-label="Pilih bagian analisis">' + SEC.map(function (t) { return '<option value="' + t[0] + '"' + (S.sub === t[0] ? ' selected' : '') + '>' + t[1] + '</option>'; }).join('') + '</select>';
     var k = S.sub, r = rows(k === 'peta' ? petaKey() : k), q, g, L; if (k === 'peta') return h + (r.length ? petaView(r) : secState('peta')); if (!r.length) return h + secState(k);
