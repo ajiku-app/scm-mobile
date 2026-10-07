@@ -144,7 +144,7 @@
   }
   function al(r) {
     var k = /krit|high|tinggi/i.test(r.tingkat) ? 'bad' : /peringat|warn|sedang/i.test(r.tingkat) ? 'warn' : '';
-    return '<div class="it"><span class="ico ' + k + '">' + ic('warn') + '</span><div><b>' + esc(r.judul) + '</b><small>' + esc(r.detail).slice(0, 90) + '</small></div>' + tg(r.tingkat) + '</div>';
+    return '<div class="tk"><span class="nd ' + k + '">' + ic('warn') + '</span><div><b>' + esc(r.judul) + '</b><small>' + esc(r.detail).slice(0, 90) + '</small></div>' + tg(r.tingkat) + '</div>';
   }
   function errNote() {
     var m = S.busy ? [] : Object.keys(Z).filter(function (k) { return !zone(k); }).map(function (k) { return '<b>' + Z[k].t + ':</b> ' + esc((zerr(k) || 'belum ada data').slice(0, 140)); });
@@ -207,26 +207,31 @@
     if (k === 'logistics' && isFinite(d.avg_load_minutes)) g += '<div class="card"><h4>Durasi loading</h4>' + hbars([['Rata-rata', 0, hm(d.avg_load_minutes), d.avg_load_minutes / (d.longest_load_minutes || d.avg_load_minutes) * 100], ['Terlama', 0, hm(d.longest_load_minutes), 100]], c) + '</div>';
     return g;
   }
+  function zc(k, i) {
+    var d = zone(k), v = d ? Number(Z[k].main(d)) : NaN, ok = isFinite(v);
+    return '<button class="zc ' + ['b', 'p', 'o', 'v'][i % 4] + '" data-v="z:' + k + '"><span class="zi">' + ic(Z[k].i) + '</span><span class="zt"><b>' + (ok ? n(v, 1) + '<em>' + (Z[k].raw ? '/hari' : '%') + '</em>' : '-') + '</b><small>' + Z[k].t + ' · ' + Z[k].s + (d ? '' : ' · ' + (S.busy ? 'Memuat' : 'Gagal')) + '</small></span><span class="za">' + ic('chev') + '</span></button>';
+  }
   function home() {
     var vs = ['stock', 'logistics', 'fefo'].map(function (k) { var d = zone(k); return d ? Number(Z[k].main(d)) : NaN; }).filter(isFinite);
-    var sc = vs.length ? vs.reduce(function (a, b) { return a + b; }, 0) / vs.length : NaN, al4 = (S.an && S.an.peringatan || []).slice(0, 4);
+    var sc = vs.length ? vs.reduce(function (a, b) { return a + b; }, 0) / vs.length : NaN, al4 = (S.an && S.an.peringatan || []).slice(0, 4), ac = S.an && S.an.peringatan ? S.an.peringatan.length : 0;
     return head('SCM Tower', S.at ? (S.stale ? 'Data tersimpan ' : 'Disinkron pukul ') + S.at : 'Memuat data...') +
       (S.busy ? pgHtml(['stock', 'logistics', 'fefo', 'warehouse', 'armada', 'peringatan'], 'Memuat data') : '') + '<div class="chips"><span class="chip">Hari ini</span>' + status() + '<span class="chip good">' + esc(S.email.split('@')[0] || 'pengguna') + '</span></div>' +
-      '<div class="hero"><div><div class="lb">Skor operasional</div><div class="big">' + (isFinite(sc) ? Math.round(sc) : '-') + '<small>%</small></div><p>' + (isFinite(sc) ? lbl(sc) + ' · dari ' + vs.length + ' dari 3 indikator' : 'Menunggu data') + '</p></div>' + gauge(sc, '#FFB020') + '</div>' + errNote() +
-      '<div class="card"><h4>Zona operasional</h4>' + Object.keys(Z).map(function (k) {
-        var d = zone(k), v = d ? Number(Z[k].main(d)) : NaN, ok = isFinite(v);
-        return '<button class="zr" data-v="z:' + k + '"><div class="row"><span>' + Z[k].t + ' · ' + Z[k].s + (d ? '' : ' <i class="tag e">' + (S.busy ? 'Memuat' : 'Gagal') + '</i>') + '</span><b>' + (ok ? n(v, 1) + (Z[k].raw ? '/hari' : '%') : '-') + '</b></div><div class="bar"><i style="width:' + (ok ? Z[k].raw ? 100 : Math.min(100, v) : 0) + '%;background:' + COL[k] + '"></i></div></button>';
-      }).join('') + '</div>' +
+      '<div class="sum"><div class="s1"><small>Skor operasional</small><b>' + (isFinite(sc) ? Math.round(sc) + '%' : '-') + '</b></div><i class="vl"></i><button class="s2" data-v="an" data-s="peringatan"><small>Peringatan</small><b>' + n(ac) + '</b></button></div>' + errNote() +
+      Object.keys(Z).map(zc).join('') +
       '<div class="tiles">' + PICK.map(function (p) { var d = zone(p[0]), x = Z[p[0]].k[p[1]], v = d && x[1](d); return d && v != null && isFinite(Number(v)) ? tile(x[0], x[2](v, d)) : ''; }).join('') + '</div>' +
-      armadaCharts() + alertDonut() + '<div class="row" style="margin:16px 4px 10px"><b>Peringatan berjalan</b><button data-v="an" data-s="peringatan" style="border:0;background:none;color:var(--good);font-weight:700;font-size:12px">Lihat semua</button></div>' +
-      '<div class="card">' + (al4.length ? al4.map(al).join('') : '<span class="sm">Tidak ada peringatan.</span>') + '</div>';
+      armadaCharts() + alertDonut() + '<div class="trh"><span>Peringatan:</span><button data-v="an" data-s="peringatan">Lihat semua</button></div>' +
+      '<div class="track">' + (al4.length ? al4.map(al).join('') : '<span class="sm">Tidak ada peringatan.</span>') + '</div>';
   }
   function detail(k) {
     var d = zone(k), z = Z[k];
     if (!d) return head(z.t, z.s, 1) + '<div class="note">' + esc(zerr(k) || 'Data zona ini belum tersedia.') + '</div><div class="card sm">Tekan tombol segarkan di tengah untuk mencoba lagi.</div>';
-    var v = Number(z.main(d)), g = zoneCharts(k, d, z, COL[k]);
-    return head(z.t, z.s, 1) + '<div class="hero"><div><div class="lb">' + z.s + '</div><div class="big">' + n(v, 1) + '<small>' + (z.raw ? '/hari' : '%') + '</small></div><p>' + (z.raw ? 'Pengiriman per hari' : lbl(v)) + '</p></div>' + gauge(z.raw ? NaN : v, '#14201A') + '</div>' +
-      '<div class="tiles">' + tiles(k) + '</div>' +
+    var v = Number(z.main(d)), g = zoneCharts(k, d, z, COL[k]), c = z.raw ? 'warn' : cls(v);
+    var its = z.k.map(function (x) { var y = x[1](d); return y == null || !isFinite(Number(y)) ? null : [x[0], x[2](y, d)]; }).filter(Boolean), tri = its.slice(1, 4), rest = its.slice(4);
+    return head(z.t, z.s, 1) +
+      '<div class="dp"><div class="dr"><span class="zi">' + ic(z.i) + '</span><div class="dk"><small>' + z.s + '</small><b>' + n(v, 1) + (z.raw ? '/hari' : '%') + '</b><small>' + z.t + '</small></div></div>' +
+      '<div class="ds"><small>Status:</small><span class="pill ' + c + '">' + (z.raw ? 'Aktif' : lbl(v)) + '</span></div><button class="fb" data-a="reload" aria-label="Segarkan">' + ic('ref') + '</button></div>' +
+      (tri.length ? '<div class="tri">' + tri.map(function (x) { return '<div><small>' + esc(x[0]) + '</small><b>' + esc(x[1]) + '</b></div>'; }).join('') + '</div>' : '') +
+      (rest.length ? '<div class="tb"><div class="tbh"><span>Indikator</span><span>Nilai</span></div>' + rest.map(function (x) { return '<div class="tbr"><span>' + esc(x[0]) + '</span><b>' + esc(x[1]) + '</b></div>'; }).join('') + '</div>' : '') +
       g;
   }
   // ---------- Analisis: hanya rekap & grafik ----------
