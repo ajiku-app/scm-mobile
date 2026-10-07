@@ -107,3 +107,36 @@ body::after{content:"";position:fixed;left:0;right:0;bottom:0;height:calc(88px +
 .ddrow .dd{flex:1 1 0;min-width:0;margin:0}
 .ddrow .dd[data-pk]{flex:0 0 36%}
 .dd{border-radius:12px;border:1px solid var(--ln);padding:12px 34px 12px 14px;font-size:14px;font-weight:500;background-position:right 12px center}
+
+/* ===== Tema gelap (navy) mengikuti referensi: kartu gradien, aksen oranye & magenta ===== */
+:root{--bg:#0A0E27;--c:#121741;--ink:#F4F6FF;--m:#9AA3D6;--ln:rgba(255,255,255,.08);--lime:#FFA11E;--lime2:#FFA11E;--dk:#0A0E27;--good:#4FD6A0;--warn:#FFC24D;--bad:#FF6B8A}
+html{background:var(--bg)}
+body{background:radial-gradient(520px 360px at 85% -60px,rgba(46,60,230,.35),transparent 70%),radial-gradient(420px 320px at -10% 35%,rgba(232,23,93,.14),transparent 70%),var(--bg);background-attachment:fixed}
+.rb,.card,.tl,.pgw,.chip,.dd{background-color:var(--c);box-shadow:none}
+.card,.tl,.pgw,.rb,.chip,.dd{border:1px solid var(--ln)}
+.rb i{background:#FF3D81}
+.hero{background:linear-gradient(135deg,#2330D6 0%,#0B1280 100%);color:#fff;border:1px solid rgba(255,255,255,.1)}
+.hero .lb,.hero p{opacity:.8}
+.bar,.pgb{background:rgba(255,255,255,.1)}
+.pgb i{background:linear-gradient(90deg,#FF3D81,#FFA11E,#FF3D81);background-size:200% 100%}
+.ico{background:rgba(255,255,255,.08)}
+.chart i,.vb i{background:rgba(255,255,255,.1)}
+.chart .hi i,.vb .hi i{background:linear-gradient(180deg,#FFB020,#F26B1D)}
+.chip.good{background:rgba(79,214,160,.14);color:var(--good)}.chip.warn{background:rgba(255,194,77,.14);color:var(--warn)}.chip.bad{background:rgba(255,107,138,.14);color:var(--bad)}
+.tag{background:rgba(79,214,160,.14);color:var(--good)}.tag.e{background:rgba(255,107,138,.16);color:var(--bad)}
+.note{background:rgba(255,107,138,.12);color:#FFB3C4;border:1px solid rgba(255,107,138,.25)}
+.av{color:#1B1305;background:linear-gradient(135deg,#FFB020,#F26B1D)}
+.dd{color:var(--ink);background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23FFA11E' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");color-scheme:dark}
+.dd option{background:#121741;color:#F4F6FF}
+.dd:focus-visible{outline-color:#FFA11E}
+/* KPI card bergradien: biru, magenta, oranye */
+.tiles .tl{border:0;color:#fff}
+.tiles .tl:nth-child(3n+1){background:linear-gradient(135deg,#2330D6,#0B1280)}
+.tiles .tl:nth-child(3n+2){background:linear-gradient(135deg,#FF2E7E,#B80F56)}
+.tiles .tl:nth-child(3n){background:linear-gradient(135deg,#FFB020,#F26B1D);color:#1B1305}
+.tiles .tl small,.tiles .tl b em{color:inherit;opacity:.78}
+/* Menu bawah */
+.nav{background:#121741;box-shadow:0 8px 28px rgba(0,0,0,.45),0 0 0 1px var(--ln)}
+.nav .on{background:linear-gradient(135deg,#FFB020,#F26B1D);color:#1B1305}
+.nav .fab{background:linear-gradient(135deg,#FF2E7E,#B80F56);color:#fff}
+.leaflet-container{background:#0F1438}

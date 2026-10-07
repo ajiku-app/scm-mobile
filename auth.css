@@ -46,3 +46,13 @@ body{font:15px/1.5 'Plus Jakarta Sans',Inter,system-ui,sans-serif;color:var(--in
 .en-msg{display:none;font-size:13px;border-radius:16px;padding:12px 14px;margin:0 0 16px}
 .en-msg.err{display:block;background:#FADADA;color:#8F2020}.en-msg.ok{display:block;background:#E3F1D6;color:#2F6B22}.en-msg.info{display:block;background:#F0F2EE;color:#44524A}
 .lf-btn:disabled{cursor:not-allowed}
+
+/* Tampilan utama: tata letak tetap, hanya background yang diganti ke navy gelap */
+body.wl-page{background:#0A0E27;color:#F4F6FF}
+body.wl-page .bg{background:radial-gradient(520px 420px at 85% -5%,rgba(46,60,230,.55),transparent 70%),radial-gradient(460px 400px at -10% 42%,rgba(232,23,93,.22),transparent 65%),radial-gradient(420px 360px at 70% 105%,rgba(255,161,30,.18),transparent 70%),#0A0E27}
+body.wl-page .wl p{color:#B4BBE6}
+body.wl-page .wl .brand small{color:#9AA3D6}
+body.wl-page .wl h1 em{color:#16211B}
+body.wl-page .btn{box-shadow:0 0 0 1px rgba(255,255,255,.16),0 10px 24px rgba(0,0,0,.4)}
+body.wl-page .fc{color:var(--ink)}
+body.wl-page .fc.c{color:#fff}
