@@ -67,3 +67,10 @@ svg.ic{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.9;str
 .pgb{height:10px;border-radius:6px;background:#E3EBD8;margin:10px 0 8px;overflow:hidden}
 .pgb i{display:block;height:100%;border-radius:6px;background:linear-gradient(90deg,var(--lime2),#C9E58A,var(--lime2));background-size:200% 100%;animation:sh 1.2s linear infinite;transition:width .3s}
 .pgl{font-size:12px;color:var(--m)}@keyframes sh{to{background-position:-200% 0}}
+
+/* Penutup area menu: konten yang di-scroll berhenti di atas menu, tidak terlihat di bawah/samping menu */
+body::after{content:"";position:fixed;left:0;right:0;bottom:0;height:calc(88px + env(safe-area-inset-bottom));background:var(--bg);z-index:19;pointer-events:none;box-shadow:0 -10px 12px -4px var(--bg)}
+
+/* Dropdown pengganti tab */
+.dd{display:block;width:100%;margin-bottom:12px;padding:14px 44px 14px 20px;border:0;border-radius:99px;background:var(--c) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2314201A' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right 18px center;-webkit-appearance:none;appearance:none;font:inherit;font-size:14px;font-weight:700;color:var(--ink);text-overflow:ellipsis}
+.dd:focus-visible{outline:2px solid var(--lime2);outline-offset:2px}

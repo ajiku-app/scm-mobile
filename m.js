@@ -1,7 +1,7 @@
 (function () {
   var DESKTOP_URL = 'https://scm-control.vercel.app/index.html'; // ganti bila alamat versi desktop berubah
   var $ = function (id) { return document.getElementById(id); };
-  var S = { v: 'home', sub: 'armada', kpi: null, an: null, anErr: '', email: '', ok: false, at: '', pk: {}, anSec: {}, fresh: {}, pg: {}, snap: {} }, uid = 0;
+  var S = { v: 'home', sub: 'armada', kpi: null, an: null, anErr: '', email: '', ok: false, at: '', pk: {}, anSec: {}, fresh: {}, pg: {} }, uid = 0;
   var P = {
     box: '<path d="M21 8l-9-5-9 5v8l9 5 9-5zM3 8l9 5 9-5M12 13v8"/>', truck: '<path d="M2 6h11v10H2zM13 10h4l3 3v3h-7zM6 19a2 2 0 1 0 0 .1M17 19a2 2 0 1 0 0 .1"/>',
     clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>', users: '<circle cx="9" cy="8" r="3"/><path d="M3 20c0-3.5 3-6 6-6s6 2.500 6 6M16 5a3 3 0 0 1 0 6M21 20c0-2.500-1.500-4.500-4-5.500"/>',
@@ -36,7 +36,6 @@
       ['Pengiriman / hari', function (d) { return d.avg_shipment_per_day; }, function (v) { return n(v, 1); }], ['Tenaga / pengiriman', function (d) { return d.avg_crew_size; }, function (v) { return n(v, 1); }],
       ['Petugas teraktif', function (d) { return d.top_karyawan_jumlah; }, function (v) { return n(v) + 'x'; }], ['Kendaraan muat / hari', function (d) { return d.req_kendaraan_muat_per_hari; }, unit]] }
   };
-  var PAL = ['#9CC94B', '#6FB1E6', '#E8C04A', '#F29BA6', '#D14343', '#8E7CC3', '#4DB6AC', '#B0B7B2'];   // palet grafik (sebelumnya tidak terdefinisi -> layar grafik error)
   var COL = { stock: '#F29BA6', logistics: '#E8C04A', fefo: '#6FB1E6', warehouse: '#9CC94B' };
   var PICK = [['stock', 3], ['stock', 4], ['logistics', 2], ['logistics', 3], ['fefo', 1], ['warehouse', 2]];
   var SEC = [['armada', 'Armada'], ['prioritas', 'Prioritas'], ['peringatan', 'Peringatan'], ['kendaraan', 'Kendaraan'], ['prediksi', 'Prediksi'], ['stok_vs_kirim', 'Stok vs Kirim'], ['tren', 'Tren'], ['harian', 'Harian'], ['durasi_ringkas', 'Durasi truk'], ['shipments_ringkas', 'Pengiriman'], ['pareto', 'Pareto'], ['biaya_carton', 'Biaya'], ['estimasi_budget', 'Budget'], ['sku_belum_master', 'Data master'], ['peta', 'Peta']];
@@ -79,7 +78,7 @@
     S.kpi = S.kpi || { zones: {} };
     if (tries === 1) tstart(k);
     try {
-      var v = await get('/api/kpi/' + k, 25000);
+      var v = await get('/api/kpi/' + k);
       if (v.status === 'live' && v.data) { S.kpi.zones[k] = { status: 'live', data: v.data, error: null }; tend(k, 1); render(); return; }
       throw new Error(v.error || 'Gagal memuat zona');
     } catch (e) {
@@ -93,52 +92,18 @@
     if (Array.isArray(p)) return p; if (!p || typeof p !== 'object') return null; if (Array.isArray(p[k])) return p[k]; if (p.data) return rowsOf(p.data, k);
     var a = Object.keys(p).filter(function (x) { return Array.isArray(p[x]); })[0]; return a ? p[a] : null;
   }
-  // ---------- Analisis: baca SNAPSHOT (tabel analisis_snapshot, dihitung sekali setelah upload harian) ----------
-  // Cepat (milidetik) karena tidak menghitung view berat. Edge Function lama hanya jadi cadangan bila snapshot kosong/tidak ada.
-  function withTimeout(p, ms, msg) {
-    return new Promise(function (ok, no) { var t = setTimeout(function () { no(new Error(msg)); }, ms); p.then(function (v) { clearTimeout(t); ok(v); }, function (e) { clearTimeout(t); no(e); }); });
-  }
-  function putSnap(row) {
-    var d = row.data; if (!Array.isArray(d) || new Date(row.updated_at).getFullYear() < 2000) return false;   // baris placeholder (belum pernah berhasil dihitung) diabaikan; hasil kosong yang sah tetap dipakai
-    S.an = S.an || {}; S.an[row.section] = d; S.fresh[row.section] = 1; S.snap[row.section] = row.updated_at; return true;
-  }
-  async function snapGet(keys) {
-    var q = window.scmSupabase.from('analisis_snapshot').select('section,data,updated_at').in('section', keys);
-    var r = await withTimeout(q, 10000, 'Snapshot lambat merespons.');
-    if (r.error) throw new Error(r.error.message || 'Snapshot error');
-    return r.data || [];
-  }
-  function snapAt() {   // waktu snapshot paling lama yang sedang dipakai
-    var ts = Object.keys(S.snap).map(function (k) { return S.snap[k]; }).filter(Boolean).sort();
-    return ts.length ? new Date(ts[0]).toLocaleString('id-ID', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '';
-  }
+  // Analisis dimuat per bagian (tab), tidak sekaligus
   async function secLoad(k, force) {
     if (S.anSec[k] === 'load' || (!force && S.fresh[k])) return;
     S.anSec[k] = 'load'; tstart(k); render();
     try {
-      // 1) jalur utama: snapshot
-      var got = false;
-      try { (await snapGet([k])).forEach(function (r) { if (putSnap(r)) got = true; }); } catch (e) { /* lanjut ke cadangan */ }
-      // 2) cadangan: Edge Function lama (hanya bila snapshot belum ada)
-      if (!got) {
-        var j = await get('/api/analisis?s=' + encodeURIComponent(k), 25000), d = j.data;
-        if (Array.isArray(d)) { var o = {}; o[k] = d; d = o; } else if (d && !Array.isArray(d[k]) && Array.isArray(d.data || d.rows)) { var o2 = {}; o2[k] = d.data || d.rows; d = o2; }
-        S.an = Object.assign(S.an || {}, d); Object.keys(d || {}).forEach(function (x) { S.fresh[x] = 1; }); S.fresh[k] = 1;
-      }
-      S.anSec[k] = ''; S.anErr = ''; tend(k, 1);
+      var j = await get('/api/analisis?s=' + encodeURIComponent(k), 58000), d = j.data;
+      if (Array.isArray(d)) { var o = {}; o[k] = d; d = o; } else if (d && !Array.isArray(d[k]) && Array.isArray(d.data || d.rows)) { var o2 = {}; o2[k] = d.data || d.rows; d = o2; }
+      S.an = Object.assign(S.an || {}, d); Object.keys(d || {}).forEach(function (x) { S.fresh[x] = 1; }); S.fresh[k] = 1; S.anSec[k] = ''; S.anErr = ''; tend(k, 1);
     } catch (e) { tend(k, 0); S.anSec[k] = 'err:' + e.message; }
     render();
   }
-  // Beranda butuh armada + peringatan: satu query untuk keduanya
-  async function homeAn() {
-    var ks = ['armada', 'peringatan'];
-    ks.forEach(function (k) { S.anSec[k] = 'load'; tstart(k); });
-    var got = {};
-    try { (await snapGet(ks)).forEach(function (r) { if (putSnap(r)) got[r.section] = 1; }); } catch (e) { /* cadangan di bawah */ }
-    ks.forEach(function (k) { if (got[k]) { S.anSec[k] = ''; tend(k, 1); } });
-    render();
-    await Promise.all(ks.filter(function (k) { return !got[k]; }).map(function (k) { S.anSec[k] = ''; return secLoad(k, 1); }));
-  }
+  async function homeAn() { await Promise.all([secLoad('armada', 1), secLoad('peringatan', 1)]); }
   function ens() { if (S.v === 'an' && S.sub && !S.fresh[S.sub]) secLoad(S.sub); }
   function secState(k) {
     var s = S.anSec[k] || '';
@@ -192,7 +157,7 @@
     var tot = parts.reduce(function (a, p) { return a + p.v; }, 0), C = 2 * Math.PI * 38, off = 0;
     if (!tot) return '<div class="sm">Belum ada data.</div>';
     var segs = parts.map(function (p) { var l = C * p.v / tot, s = '<circle cx="50" cy="50" r="38" fill="none" stroke="' + p.c + '" stroke-width="12" stroke-dasharray="' + Math.max(0, l - 2) + ' ' + (C - l + 2) + '" stroke-dashoffset="' + -off + '" transform="rotate(-90 50 50)"/>'; off += l; return s; }).join('');
-    return '<div class="dn"><svg width="120" height="120" viewBox="0 0 100 100" style="flex:none"><circle cx="50" cy="50" r="38" fill="none" stroke="rgba(20,32,26,.06)" stroke-width="12"/>' + segs + '<text x="50" y="56" text-anchor="middle" font-size="' + Math.max(9, Math.min(18, Math.floor(50 / (String(center).length * .62)))) + '" font-weight="800" fill="#14201A">' + esc(center) + '</text></svg><div class="lg">' +
+    return '<div class="dn"><svg width="120" height="120" viewBox="0 0 100 100" style="flex:none"><circle cx="50" cy="50" r="38" fill="none" stroke="rgba(20,32,26,.06)" stroke-width="12"/>' + segs + '<text x="50" y="56" text-anchor="middle" font-size="18" font-weight="800" fill="#14201A">' + esc(center) + '</text></svg><div class="lg">' +
       parts.map(function (p) { return '<div><i style="background:' + p.c + '"></i><span>' + esc(p.l) + '</span><b>' + n(p.v) + '</b></div>'; }).join('') + '</div></div>';
   }
   function area(vals, labs, c) {
@@ -222,16 +187,13 @@
   function uq(r, k) { var o = []; r.forEach(function (x) { var v = String(x[k]); if (o.indexOf(v) < 0) o.push(v); }); return o; }
   function pick(key, vals) {
     var cur = vals.indexOf(S.pk[key]) > -1 ? S.pk[key] : vals[0];
-    return [cur, vals.length > 1 ? '<div class="seg">' + vals.map(function (v) { return '<button data-p="' + esc(key + '|' + v) + '"' + (v === cur ? ' class="on"' : '') + '>' + esc(v) + '</button>'; }).join('') + '</div>' : ''];
+    return [cur, vals.length > 1 ? '<select class="dd" data-pk="' + esc(key) + '" aria-label="Pilih periode">' + vals.map(function (v) { return '<option value="' + esc(v) + '"' + (v === cur ? ' selected' : '') + '>' + esc(String(v).replace(/_/g, ' ')) + '</option>'; }).join('') + '</select>' : ''];
   }
-  // baris "SEMUA" = total semua gudang; kalau ikut dijumlahkan, angka terhitung dua kali
-  function armGud(a) { var g = a.filter(function (r) { return !/^\s*(semua|all|total)\s*$/i.test(String(r.whs)); }); return g.length ? g : a; }
   function armadaCharts(per) {
     var a = rows('armada'); if (!a.length) return '';
-    per = per || pick('per', uq(a, 'periode'))[0]; a = armGud(a.filter(function (r) { return String(r.periode) === per; }));
+    per = per || pick('per', uq(a, 'periode'))[0]; a = a.filter(function (r) { return String(r.periode) === per; });
     var g = group(a, function (r) { return r.whs; }, function (r) { return r.total_karton; }).sort(function (x, y) { return y[1] - x[1]; }).slice(0, 8);
-    var u = [sum(a, function (r) { return r.ctn_40ft; }), sum(a, function (r) { return r.bwb; }), sum(a, function (r) { return r.ctn_20ft; })];
-    return '<div class="card"><h4>Total karton per gudang · ' + esc(per) + '</h4>' + vbars(g) + '</div><div class="card"><h4>Komposisi armada · ' + n(u[0] + u[1] + u[2]) + ' unit</h4>' + donut([{ l: 'Cont. 40 ft', c: PAL[0], v: u[0] }, { l: 'BWB', c: PAL[1], v: u[1] }, { l: 'Cont. 20 ft', c: PAL[2], v: u[2] }], n(u[0] + u[1] + u[2])) + '</div>';
+    return '<div class="card"><h4>Total karton per gudang · ' + esc(per) + '</h4>' + vbars(g) + '</div><div class="card"><h4>Komposisi armada</h4>' + donut([{ l: 'Cont. 40 ft', c: PAL[0], v: sum(a, function (r) { return r.ctn_40ft; }) }, { l: 'BWB', c: PAL[1], v: sum(a, function (r) { return r.bwb; }) }, { l: 'Cont. 20 ft', c: PAL[2], v: sum(a, function (r) { return r.ctn_20ft; }) }], n(sum(a, function (r) { return r.total_karton; }))) + '</div>';
   }
 
   function zoneCharts(k, d, z, c) {
@@ -307,10 +269,10 @@
     m.fitBounds(b, { padding: [20, 20], maxZoom: 9 });
   }
   function an() {
-    var h = head('Analisis', snapAt() ? 'Data per ' + snapAt() : 'Rekap & prediksi', 1);
-    h += '<div class="seg">' + SEC.map(function (t) { return '<button data-s="' + t[0] + '"' + (S.sub === t[0] ? ' class="on"' : '') + '>' + t[1] + '</button>'; }).join('') + '</div>';
+    var h = head('Analisis', 'Rekap & prediksi', 1);
+    h += '<select class="dd" data-sk="1" aria-label="Pilih bagian analisis">' + SEC.map(function (t) { return '<option value="' + t[0] + '"' + (S.sub === t[0] ? ' selected' : '') + '>' + t[1] + '</option>'; }).join('') + '</select>';
     var k = S.sub, r = rows(k === 'peta' ? petaKey() : k), q, g, L; if (k === 'peta') return h + (r.length ? petaView(r) : secState('peta')); if (!r.length) return h + secState(k);
-    if (k === 'armada') { q = pick('per', uq(r, 'periode')); var ra = armGud(r.filter(function (x) { return String(x.periode) === q[0]; })); return h + q[1] + tls([['Total karton', n(sum(ra, function (x) { return x.total_karton; }))], ['Total m³', n(sum(ra, function (x) { return x.total_m3; }))], ['Total ton', n(sum(ra, function (x) { return x.total_ton; }), 1)], ['Jumlah gudang', n(uq(ra, 'whs').length)]]) + armadaCharts(q[0]); }
+    if (k === 'armada') { q = pick('per', uq(r, 'periode')); var ra = r.filter(function (x) { return String(x.periode) === q[0]; }); return h + q[1] + tls([['Total karton', n(sum(ra, function (x) { return x.total_karton; }))], ['Total m³', n(sum(ra, function (x) { return x.total_m3; }))], ['Total ton', n(sum(ra, function (x) { return x.total_ton; }), 1)], ['Jumlah gudang', n(uq(ra, 'whs').length)]]) + armadaCharts(q[0]); }
     if (k === 'peringatan') return h + alertDonut() + '<div class="card"><h4>Teratas</h4>' + r.slice(0, 5).map(al).join('') + '</div>';
     if (k === 'prioritas') return h + tls([['SKU prioritas', n(r.length)], ['Dampak m³', n(sum(r, function (x) { return x.dampak_m3; }))]]) + dn(r, function (x) { return x.aksi || '-'; }, 'Berdasarkan aksi') + rank(r.map(function (x) { return [x.produk || x.kode_sku, N(x.hari_cukup_prediksi)]; }), function (v) { return n(v, 1) + ' hr'; }, '#D14343', 'Stok paling cepat habis', 1);
     if (k === 'tren' || k === 'shipments_ringkas') {
@@ -332,19 +294,18 @@
     return head('Profil', 'Akun & pengaturan', 1) + '<div class="card"><div class="av">' + esc((S.email[0] || 'U').toUpperCase()) + '</div><div class="sm">Masuk sebagai</div><b>' + esc(S.email || '-') + '</b></div><div class="card pf"><button data-a="reload"><span>Muat ulang data</span>' + ic('chev') + '</button><a href="' + DESKTOP_URL + '"><span>Buka versi desktop</span>' + ic('chev') + '</a><button data-a="out" class="bad"><span>Keluar</span>' + ic('chev') + '</button></div>';
   }
   function render() {
-    var html;
-    try { html = S.v === 'home' ? home() : S.v === 'an' ? an() : S.v === 'me' ? me() : detail(S.v.slice(2)); }
-    catch (e) {   // satu layar error tidak boleh membekukan menu
-      try { console.error(e); } catch (_) {}
-      html = head('Terjadi kesalahan', 'Layar gagal ditampilkan', 1) + '<div class="note"><b>Kesalahan tampilan:</b> ' + esc(e && e.message || e) + '</div><div class="card sm">Coba menu lain atau tekan tombol segarkan.</div>';
-    }
-    $('main').innerHTML = html;
+    $('main').innerHTML = S.v === 'home' ? home() : S.v === 'an' ? an() : S.v === 'me' ? me() : detail(S.v.slice(2));
     var on = function (v) { return S.v === v ? ' class="on"' : ''; };
     var NAV = [['home', 'home', 'Dashboard'], ['an', 'chart', 'Analysis'], ['z:fefo', 'clock', 'Fefo'], ['z:stock', 'box', 'Monitoring'], ['z:logistics', 'truck', 'Logistik']];
     $('nav').innerHTML = NAV.map(function (x) { return '<button data-v="' + x[0] + '"' + on(x[0]) + ' aria-label="' + x[2] + '">' + ic(x[1]) + '<span>' + x[2] + '</span></button>'; }).join('');
     var c = document.querySelector('.seg .on'); if (c && c.scrollIntoView) c.scrollIntoView({ inline: 'center', block: 'nearest' });
     initMap();
   }
+  document.addEventListener('change', function (e) {
+    var t = e.target; if (!t.classList || !t.classList.contains('dd')) return;
+    if (t.dataset.pk) { S.pk[t.dataset.pk] = t.value; render(); }
+    else if (t.dataset.sk) { S.sub = t.value; render(); ens(); }
+  });
   document.addEventListener('click', function (e) {
     var t = e.target.closest('[data-v],[data-s],[data-a],[data-p]'); if (!t) return;
     if (t.dataset.p) { var pp = t.dataset.p.split('|'); S.pk[pp[0]] = pp.slice(1).join('|'); render(); }
