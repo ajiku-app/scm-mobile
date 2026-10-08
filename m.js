@@ -249,7 +249,7 @@
     'Total kuantitas terkirim': 'f_total', 'Rata-rata freshness SLED saat kirim': 'f_fresh', 'SLA (Service Level Agreement)': 'f_sla', 'Warehouse Throughput': 'f_thr', 'Dead Stock / Near-Expired Risk': 'f_risk', 'Batch Traceability Rate': 'f_trace',
     'Total Pengiriman': 'l_total', 'Rata-rata Durasi Loading': 'l_dur', 'Ekspedisi Aktif': 'l_eksp', 'SLA Loading': 'l_sla', 'Konsentrasi Ekspedisi': 'l_konsen', 'Utilisasi Kendaraan': 'l_util' };
   function kpCard(c, label, val, sub, dl, extra) {
-    var up = dl > 0, ch = isFinite(dl) ? '<span class="dl ' + (up ? 'up' : 'dn') + '">' + (up ? '▲' : '▼') + ' ' + n(Math.abs(dl), 1) + '%</span>' : '', mk = MK[label];
+    var up = dl > 0, ch = isFinite(dl) ? '<span class="dl ' + (up ? 'up' : 'dn') + '">' + (up ? '▲' : '▼') + ' ' + n(Math.abs(dl), 1) + '%</span>' : '', mk = arguments[6] || MK[label];
     return '<div class="kp ' + (extra || '') + (mk ? ' clk' : '') + '" style="--kc:' + c + '"' + (mk ? ' role="button" tabindex="0" data-m="' + mk + '" aria-label="' + esc(label) + ' — lihat 10 data teratas"' : '') + '><div class="kh"><small>' + esc(label) + '</small>' + ch + '</div><b>' + val + '</b>' + (sub ? '<span>' + sub + '</span>' : '') + '</div>';
   }
   // ---------- hitung KPI dari data stok (v_stok_terbaru + v_stok_vs_kirim) ----------
@@ -466,10 +466,14 @@
   }
   function mdlSpec() {
     var k = S.mdl && S.mdl.k; if (!k) return null;
-    var sp = k.charAt(0) === 'f' ? fefSpec(k) : k.charAt(0) === 'l' ? logSpec(k) : stkSpec(k); return sp;
+    var sp = k.charAt(0) === 'f' ? fefSpec(k) : k.charAt(0) === 'l' ? logSpec(k) : k.charAt(0) === 'b' ? bizSpec(k) : stkSpec(k); return sp;
   }
   function mdlHtml(sp) {
     var head = '<div class="mhd"><div><h3 id="mdlT">' + esc(sp.title || (S.mdl.k.charAt(0) === 'f' ? 'Detail FEFO' : S.mdl.k.charAt(0) === 'l' ? 'Detail logistik' : 'Detail stok')) + '</h3><small>' + (sp.sub || 'Top 10 data teratas') + '</small></div><button class="mcl" data-mx="1" aria-label="Tutup">×</button></div>';
+    if (sp.kv) {
+      var mt = sp.meter ? '<div class="mtr"><div class="mtb"><i style="width:' + Math.max(2, Math.min(100, sp.meter.p / 160 * 100)).toFixed(1) + '%;background:' + sp.meter.c + '"></i><u style="left:' + (90 / 160 * 100) + '%"></u><u style="left:' + (110 / 160 * 100) + '%"></u></div><div class="mtl"><span>0%</span><span>90%</span><span>110%</span><span>160%+</span></div></div>' : '';
+      return head + '<div class="mbd">' + mt + sp.kv.map(function (p) { return '<div class="kvr"><span>' + esc(p[0]) + '</span><b>' + p[1] + '</b></div>'; }).join('') + '</div><div class="mft">' + (sp.note || '') + '</div>';
+    }
     if (!sp.tabs) {
       var body = sp.err ? '<div class="note" style="margin:0"><b>Data belum bisa dibaca.</b><div style="margin:4px 0 8px">' + esc(sp.err) + '</div><button class="chip" data-a="' + sp.retry + '">Coba lagi</button></div>' : '<div class="sm" style="padding:18px 0">Memuat data…</div>';
       return head + '<div class="mbd">' + body + '</div>';
@@ -490,7 +494,7 @@
   }
   function openM(key) {
     S.mdl = { k: key, t: '' }; mdlSync();
-    if (key.charAt(0) === 'f') dimLoad(); else if (key.charAt(0) === 'l') { if (!S.log && S.logSt !== 'load') logLoad(); } else if (!S.stk && S.stkSt !== 'load') stkLoad();
+    if (key.charAt(0) === 'f') dimLoad(); else if (key.charAt(0) === 'b') { /* data sudah dimuat bersama seksi */ } else if (key.charAt(0) === 'l') { if (!S.log && S.logSt !== 'load') logLoad(); } else if (!S.stk && S.stkSt !== 'load') stkLoad();
   }
 
 
@@ -586,6 +590,65 @@
     }) };
   }
 
+
+  // ---------- Analisa Biaya tenaga kerja per karton (mengikuti dashboard desktop) ----------
+  var BST = { Efisien: '#34C9AE', Efektif: '#6FA8FF', Boros: '#FF6B8A' };
+  function bHas(r) { return r.slice().sort(function (a, b) { return a.bulan < b.bulan ? -1 : 1; }); }
+  function bOk(x) { return x.biaya_per_carton != null && isFinite(Number(x.biaya_per_carton)); }
+  function bShort(iso) { try { return new Date(String(iso).slice(0, 10) + 'T00:00:00Z').toLocaleDateString('id-ID', { month: 'short', year: '2-digit', timeZone: 'UTC' }); } catch (e) { return String(iso).slice(0, 7); } }
+  function bMid(iso) { try { return new Date(String(iso).slice(0, 10) + 'T00:00:00Z').toLocaleDateString('id-ID', { month: 'short', year: 'numeric', timeZone: 'UTC' }); } catch (e) { return String(iso).slice(0, 7); } }
+  function bLong(iso) { return monLbl(String(iso).slice(0, 10)); }
+  function bPick(rs, kind) {
+    var ok = rs.filter(bOk); if (!ok.length) return null;
+    if (kind === 'now') return ok[ok.length - 1];
+    return ok.reduce(function (a, x) { return (kind === 'hi' ? Number(x.biaya_per_carton) > Number(a.biaya_per_carton) : Number(x.biaya_per_carton) < Number(a.biaya_per_carton)) ? x : a; });
+  }
+  function biayaView(r) {
+    var rs = bHas(r), ok = rs.filter(bOk); if (!ok.length) return '<div class="note">Belum ada bulan dengan data cost labour.</div>';
+    var cur = bPick(rs, 'now'), hi = bPick(rs, 'hi'), lo = bPick(rs, 'lo'), avg = sum(ok, function (x) { return Number(x.biaya_per_carton); }) / ok.length, tg = Number(cur.target_rp);
+    var st = function (x) { return '<span style="color:' + (BST[x.status_efisiensi] || '#9AA3D6') + '">' + esc(x.status_efisiensi || '') + '</span>'; };
+    var intro = '<div class="card"><h4>Biaya tenaga kerja per karton</h4><p class="sm" style="margin:-6px 0 0;line-height:1.55">Cost labour bulanan (biaya tenaga muat) dibagi total karton terkirim bulan tersebut (dari <code>shipments</code>), dibandingkan target dari <code>target_biaya_karton</code>. Status: <b>Efisien</b> jika biaya ≤ 90% target, <b>Efektif</b> jika dalam rentang ±10% target, <b>Boros</b> jika &gt; 110% target. Cost labour dan rata-rata jumlah karyawan diinput manual per bulan; total kirim selalu ikut data terbaru. Bulan yang belum ditutup tampil kosong sampai datanya diisi.</p></div>';
+    var cards = '<div class="kps">' +
+      kpCard(BST[cur.status_efisiensi] || '#FFB020', bMid(cur.bulan), 'Rp ' + n(cur.biaya_per_carton, 0), st(cur) + ' · target ' + idr(cur.target_rp), NaN, '', 'b_now') +
+      kpCard('#4F7BFF', 'Rata-rata', 'Rp ' + n(avg, 0), n(ok.length) + ' bulan dengan data cost labour', NaN, '', 'b_avg') +
+      kpCard('#FF5C6C', 'Tertinggi', 'Rp ' + n(hi.biaya_per_carton, 0), bMid(hi.bulan) + ' · ' + st(hi), NaN, '', 'b_hi') +
+      kpCard('#2FBF8A', 'Terendah', 'Rp ' + n(lo.biaya_per_carton, 0), bMid(lo.bulan) + ' · ' + st(lo), NaN, '', 'b_lo') + '</div>';
+    // grafik batang
+    var W = 340, H = 232, T = 26, B = 50, pad = 6, m = rs.length, sl = (W - pad * 2) / m, bw = Math.min(30, sl * 0.62), mx = Math.max.apply(0, ok.map(function (x) { return Number(x.biaya_per_carton); }).concat([tg || 0])) * 1.12, base = H - B;
+    var Y = function (v) { return base - v / mx * (base - T); }, o = '';
+    if (tg) o += '<line x1="' + pad + '" x2="' + (W - pad) + '" y1="' + Y(tg) + '" y2="' + Y(tg) + '" stroke="rgba(255,255,255,.45)" stroke-dasharray="4 4"/><text x="' + (W - pad) + '" y="' + (Y(tg) - 4) + '" text-anchor="end" font-size="9" fill="#C9CFF0">Target Rp ' + n(tg, 0) + '</text>';
+    o += '<line x1="' + pad + '" x2="' + (W - pad) + '" y1="' + base + '" y2="' + base + '" stroke="rgba(255,255,255,.15)"/>';
+    rs.forEach(function (x, i) {
+      var cx = pad + sl * i + sl / 2, has = bOk(x), c = BST[x.status_efisiensi] || '#6FA8FF', v = has ? Number(x.biaya_per_carton) : 0, y = Y(v);
+      o += '<g data-m="b_m:' + esc(String(x.bulan).slice(0, 10)) + '" role="button" tabindex="0" aria-label="' + esc(bLong(x.bulan)) + ': ' + (has ? 'Rp ' + n(v, 0) + ' ' + esc(x.status_efisiensi || '') : 'belum ada data') + '" style="cursor:pointer">' +
+        (has ? '<rect x="' + (cx - bw / 2) + '" y="' + y + '" width="' + bw + '" height="' + (base - y) + '" rx="4" fill="' + c + '" fill-opacity=".92"/><text x="' + cx + '" y="' + (y - 5) + '" text-anchor="middle" font-size="9.5" font-weight="700" fill="#fff">' + n(v, 0) + '</text>' : '<text x="' + cx + '" y="' + (base - 6) + '" text-anchor="middle" font-size="12" fill="#9AA3D6">—</text>') +
+        '<text x="' + cx + '" y="' + (base + 14) + '" text-anchor="middle" font-size="9" fill="#C9CFF0">' + esc(bShort(x.bulan).replace(' ', ' ')) + '</text><text x="' + cx + '" y="' + (base + 27) + '" text-anchor="middle" font-size="8" font-weight="700" fill="' + (has ? c : '#6B74A8') + '">' + (has ? esc(x.status_efisiensi || '') : '') + '</text><rect x="' + (cx - sl / 2) + '" y="0" width="' + sl + '" height="' + H + '" fill="transparent"/></g>';
+    });
+    var chart = '<div class="card"><h4>Biaya per karton per bulan (Rp)</h4><svg class="ar" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Grafik biaya per karton per bulan">' + o + '</svg><div class="sm">Ketuk batang atau baris bulan untuk melihat detail.</div></div>';
+    // daftar bulan (setara tabel desktop)
+    var list = '<div class="card"><h4>Detail per bulan</h4>' + rs.slice().reverse().map(function (x) {
+      var has = bOk(x), c = BST[x.status_efisiensi] || '#6B74A8', p = Number(x.pct_dari_target);
+      return '<div class="bm" role="button" tabindex="0" data-m="b_m:' + esc(String(x.bulan).slice(0, 10)) + '" aria-label="Detail ' + esc(bLong(x.bulan)) + '"><div class="bh"><b>' + esc(bLong(x.bulan)) + '</b>' + (has ? '<span class="bs" style="color:' + c + ';background:' + c + '22">' + esc(x.status_efisiensi || '') + '</span>' : '<span class="bs" style="color:#9AA3D6;background:rgba(255,255,255,.08)">Belum diisi</span>') + '</div>' +
+        '<div class="bv"><span>' + (has ? 'Rp ' + n(x.biaya_per_carton, 0) + '<small> / karton</small>' : '—') + '</span><span class="bp">' + (isFinite(p) && has ? n(p, 1) + '% target' : '') + '</span></div>' +
+        (has ? '<span class="mbar"><u style="width:' + Math.max(3, Math.min(100, p / 160 * 100)).toFixed(1) + '%;background:' + c + '"></u></span>' : '') +
+        '<div class="sm">Kirim ' + n(x.total_delivery) + ' karton' + (has ? ' · Cost ' + idr(x.cost_labour) + ' · ' + n(x.total_labour) + ' karyawan' : '') + '</div></div>';
+    }).join('') + '</div>';
+    return intro + cards + chart + list;
+  }
+  function bizSpec(key) {
+    var rs = bHas(rows('biaya_carton')); if (!rs.length) return null;
+    var ok = rs.filter(bOk);
+    if (key === 'b_avg') {
+      return { title: 'Rata-rata biaya per karton', sub: n(ok.length) + ' bulan dengan data cost labour', tabs: [{ id: 'm', label: 'Per bulan', note: 'Biaya per karton per bulan, diurutkan dari tertinggi. Persen = biaya dibanding target.', rows: ok.slice().sort(function (a, b) { return Number(b.biaya_per_carton) - Number(a.biaya_per_carton); }).map(function (x) { return { l: bLong(x.bulan), s: (x.status_efisiensi || '') + ' · target ' + idr(x.target_rp), v: Number(x.biaya_per_carton), x: 'Rp ' + n(x.biaya_per_carton, 0), p: n(x.pct_dari_target, 1) + '%' }; }) }] };
+    }
+    var x = key === 'b_now' ? bPick(rs, 'now') : key === 'b_hi' ? bPick(rs, 'hi') : key === 'b_lo' ? bPick(rs, 'lo') : rs.filter(function (z) { return String(z.bulan).slice(0, 10) === key.slice(4); })[0];
+    if (!x) return null;
+    var has = bOk(x), c = BST[x.status_efisiensi] || '#9AA3D6', tg = Number(x.target_rp), v = Number(x.biaya_per_carton), sel = has && isFinite(tg) ? v - tg : NaN;
+    var kv = [['Total kirim (karton)', n(x.total_delivery)], ['Cost labour', has ? 'Rp ' + n(x.cost_labour) : '—'], ['Rata² karyawan / bulan', has ? n(x.total_labour) : '—'], ['Biaya / karton', has ? 'Rp ' + n(v, 2) : '—'], ['Target', 'Rp ' + n(tg, 0)], ['% target', has ? n(x.pct_dari_target, 1) + '%' : '—'], ['Selisih dari target', isFinite(sel) ? (sel > 0 ? '+' : '−') + 'Rp ' + n(Math.abs(sel), 0) + ' / karton' : '—'], ['Status', has ? '<span style="color:' + c + ';font-weight:700">' + esc(x.status_efisiensi || '') + '</span>' : 'Belum diisi']];
+    return { title: 'Biaya tenaga kerja — ' + bLong(x.bulan), sub: has ? 'Cost labour ÷ total karton terkirim' : 'Cost labour belum diinput untuk bulan ini', kv: kv, meter: has ? { p: Number(x.pct_dari_target), c: c } : null,
+      note: has ? 'Biaya/karton = Rp ' + n(x.cost_labour) + ' ÷ ' + n(x.total_delivery) + ' karton. Efisien ≤ 90% target · Efektif 90–110% · Boros &gt; 110%.' : 'Total kirim ikut data terbaru; cost labour dan rata-rata karyawan diinput manual per bulan.' };
+  }
+
   function detail(k) {
     var d = zone(k), z = Z[k];
     if (!d) return head(z.t, z.s, 1) + '<div class="note">' + esc(zerr(k) || 'Data zona ini belum tersedia.') + '</div><div class="card sm">Tekan tombol segarkan di tengah untuk mencoba lagi.</div>';
@@ -664,7 +727,7 @@
     if (k === 'harian') { q = r.slice().sort(function (a, b) { return a.tanggal < b.tanggal ? -1 : 1; }).slice(-14); return h + tls([['Total qty', n(sum(q, function (x) { return x.qty; }))], ['Total trip', n(sum(q, function (x) { return x.trip; }))], ['Total m³', n(sum(q, function (x) { return x.m3; }))]]) + lines(q, 'tanggal', [['qty', 'Qty per hari'], ['trip', 'Trip per hari']], day); }
     if (k === 'durasi_ringkas') { q = byDim(r, k); return h + q[1] + tls([['Total trip', n(sum(q[0], function (x) { return x.jumlah_trip; }))], ['Trip lama', n(sum(q[0], function (x) { return x.jumlah_lama; }))]]) + rank(q[0].map(function (x) { return [x.kunci, N(x.rata2_durasi_menit)]; }), hm, PAL[2], 'Rata-rata durasi terlama'); }
     if (k === 'pareto') { q = byDim(r, k); return h + q[1] + rank(q[0].map(function (x) { return [x.nama || x.kunci, N(x.porsi_pct)]; }), pct, PAL[1], 'Kontribusi terbesar') + dn(q[0], function (x) { return x.kelas || '-'; }, 'Sebaran kelas'); }
-    if (k === 'biaya_carton' && r[0].bulan) { L = last(r.slice().sort(function (a, b) { return a.bulan < b.bulan ? -1 : 1; })); return h + tls([['Biaya / carton', idr(L.biaya_per_carton)], ['Target', idr(L.target_rp)], ['Dari target', isFinite(N(L.pct_dari_target)) ? pct(L.pct_dari_target) : null], ['Status', L.status_efisiensi]]) + lines(r, 'bulan', [['biaya_per_carton', 'Biaya per carton (Rp)']], mon); }
+    if (k === 'biaya_carton' && r[0].bulan) return h + biayaView(r);
     if (k === 'estimasi_budget') { L = r[0]; var it = [['Proyeksi terendah', N(L.proyeksi_biaya_rp_terendah)], ['Proyeksi', N(L.proyeksi_biaya_rp)], ['Proyeksi tertinggi', N(L.proyeksi_biaya_rp_tertinggi)], ['Budget ideal', N(L.budget_ideal_rp)]].filter(function (x) { return isFinite(x[1]); }), mx = Math.max.apply(0, it.map(function (x) { return x[1]; })) || 1; return h + tls([['Proyeksi qty 22 hari', n(L.proyeksi_qty_22hari)], ['Rata-rata biaya / carton', idr(L.rata2_biaya_per_carton)]]) + '<div class="card"><h4>Estimasi biaya bulan depan</h4>' + hbars(it.map(function (x) { return [x[0], 0, idr(x[1]), x[1] / mx * 100]; }), PAL[0]) + '</div>'; }
     if (k === 'kendaraan') { L = r[0]; return h + tls([['Kebutuhan kendaraan', n(L.kebutuhan_kendaraan)], ['Qty karton', n(L.qty_karton)], ['m³ rencana', n(L.m3_plan)], ['Rata-rata trip / hari', n(L.rata2_trip_per_hari, 1)]]) + '<div class="card"><h4>Dibutuhkan vs rata-rata historis</h4>' + hbars([['Dibutuhkan hari ini', 0, n(L.kebutuhan_kendaraan), N(L.kebutuhan_kendaraan) / (Math.max(N(L.kebutuhan_kendaraan), N(L.rata2_trip_per_hari)) || 1) * 100], ['Rata-rata trip / hari', 0, n(L.rata2_trip_per_hari, 1), N(L.rata2_trip_per_hari) / (Math.max(N(L.kebutuhan_kendaraan), N(L.rata2_trip_per_hari)) || 1) * 100]], PAL[1]) + '</div>'; }
     if (k === 'prediksi') return h + tls([['SKU diprediksi', n(r.length)], ['Proyeksi qty 22 hari', n(sum(r, function (x) { return x.proyeksi_qty_22hari; }))]]) + dn(r, function (x) { return x.status_prediksi || '-'; }, 'Status prediksi') + rank(r.map(function (x) { return [x.produk, N(x.kekurangan_22hari)]; }).filter(function (x) { return x[1] > 0; }), function (v) { return n(v); }, '#D14343', 'Kekurangan stok 22 hari');

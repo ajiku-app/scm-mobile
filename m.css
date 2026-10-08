@@ -241,3 +241,15 @@ body{background:radial-gradient(520px 360px at 85% -60px,rgba(46,60,230,.35),tra
 .tp{display:flex;gap:10px;align-items:center;padding:9px 10px;margin-bottom:6px;background:rgba(255,255,255,.04);border-radius:12px}
 .tp>div{flex:1;min-width:0}.tp b{display:block;font-size:13px;font-weight:600;overflow-wrap:anywhere;line-height:1.3}.tp .up{display:block;color:#FFB020;font-size:11.5px;margin-top:2px}
 .tp .tv{flex:none;font-size:12px;color:var(--m)}.tp.low .rk{background:rgba(255,107,138,.2);color:#FF6B8A}
+
+/* ===== Analisa Biaya ===== */
+.card code{font-size:11.5px;background:rgba(255,255,255,.08);padding:1px 5px;border-radius:5px}
+.bm{padding:12px 0;border-top:1px solid var(--ln);cursor:pointer}.bm:first-of-type{border-top:0}.bm:focus-visible{outline:2px solid #FFA11E;outline-offset:2px}
+.bh{display:flex;justify-content:space-between;align-items:center;gap:8px}.bh b{font-size:14px;font-weight:600}
+.bs{font-size:11px;font-weight:700;padding:3px 10px;border-radius:99px}
+.bv{display:flex;justify-content:space-between;align-items:baseline;margin:6px 0 2px;font-size:20px;font-weight:600;letter-spacing:-.01em}.bv small{font-size:11.5px;color:var(--m);font-weight:400}.bp{font-size:12px;color:var(--m);font-weight:500}
+.bm .mbar{margin:4px 0 6px}
+.kvr{display:flex;justify-content:space-between;gap:14px;padding:11px 0;border-top:1px solid var(--ln);font-size:13px}.kvr:first-of-type{border-top:0}.kvr span{color:var(--m)}.kvr b{font-weight:600;text-align:right}
+.mtr{margin:2px 0 14px}.mtb{position:relative;height:10px;border-radius:6px;background:rgba(255,255,255,.08)}.mtb i{position:absolute;left:0;top:0;bottom:0;border-radius:6px}.mtb u{position:absolute;top:-3px;bottom:-3px;border-left:2px solid rgba(255,255,255,.55);text-decoration:none}
+.mtl{display:flex;justify-content:space-between;font-size:10.5px;color:var(--m);margin-top:6px}
+svg.ar g:focus-visible{outline:2px solid #FFA11E}
