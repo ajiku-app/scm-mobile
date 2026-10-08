@@ -742,8 +742,54 @@
     S.pts.forEach(function (x) { var p = [N(x.lat), N(x.lng)]; b.push(p); L.circleMarker(p, { radius: 6 + Math.sqrt(N(x.total_qty) / mx) * 16, color: '#FFFFFF', weight: 1, fillColor: '#8DAA6E', fillOpacity: .65 }).addTo(m).bindPopup('<b>' + esc(x.label) + '</b><br>' + n(x.total_qty) + ' qty · ' + n(x.jml_pelanggan) + ' pelanggan'); });
     m.fitBounds(b, { padding: [20, 20], maxZoom: 9 });
   }
+  // ---------- Tabel detail data untuk setiap bagian Analisis (setara tabel di versi desktop) ----------
+  var TOK = { sku: 'SKU', qty: 'Qty', m3: 'm³', pct: '%', rp: 'Rp', hr: 'Hari', whs: 'Gudang', sled: 'SLED', id: 'ID', kg: 'Kg', fg: 'FG', fefo: 'FEFO', km: 'KM', per: 'per' };
+  var CODE = /kode|code|(^|_)id$|(^|_)no(_|$)|nomor|sku$|whs|telp|phone|plat|lat$|lng$|lon$/i, MONEY = /(^|_)(rp|biaya|budget|cost|harga)(_|$)/i, PCT = /pct|persen|rate/i, STAT = /status|kelas|aksi|level|kategori|prioritas|masalah/i;
+  function colLbl(k) { return String(k).split('_').map(function (w, i) { var u = TOK[w.toLowerCase()]; return u || (i ? w : w.charAt(0).toUpperCase() + w.slice(1)); }).join(' '); }
+  function isNumV(v) { return v !== '' && v != null && typeof v !== 'boolean' && isFinite(Number(v)); }
+  function badgeC(v) {
+    v = String(v).toLowerCase();
+    if (/efisien|baik|aman|normal|cukup|tersedia|^ok$|selesai|sesuai|^a$/.test(v)) return '#5E9C7C';
+    if (/boros|kritis|bahaya|habis|kurang|lambat|stres|tinggi|lama|expired|masalah|urgent|segera/.test(v)) return '#C0504D';
+    if (/efektif|waspada|perhatian|warning|sedang|^b$|^c$|menipis/.test(v)) return '#B98A5E';
+    return '#8A8185';
+  }
+  function cellV(k, v, numCol) {
+    if (v == null || v === '') return '—';
+    if (typeof v === 'boolean') return v ? 'Ya' : 'Tidak';
+    if (typeof v === 'object') return '—';
+    if (/^\d{4}-\d\d-\d\d/.test(String(v)) && !numCol) {
+      var d = new Date(String(v).slice(0, 10) + 'T00:00:00Z'); if (isNaN(d)) return esc(String(v));
+      return esc(/bulan|periode/i.test(k) && String(v).slice(8, 10) === '01' ? d.toLocaleDateString('id-ID', { month: 'short', year: 'numeric', timeZone: 'UTC' }) : d.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' }));
+    }
+    if (numCol) { var x = Number(v); return MONEY.test(k) ? 'Rp ' + n(x, 0) : PCT.test(k) ? n(x, 1) + '%' : n(x, Number.isInteger(x) ? 0 : (Math.abs(x) >= 100 ? 1 : 2)); }
+    if (STAT.test(k) && String(v).length < 28) { var c = badgeC(v); return '<span class="bs" style="color:' + c + ';background:' + c + '22">' + esc(v) + '</span>'; }
+    return esc(String(v));
+  }
+  function detRows(k, r) {
+    if (k === 'armada') { var q = pick('per', uq(r, 'periode')); return r.filter(function (x) { return String(x.periode) === q[0]; }); }
+    if (k === 'tren' || k === 'shipments_ringkas' || k === 'durasi_ringkas' || k === 'pareto') return byDim(r, k)[0];
+    return r;
+  }
+  function detailTable(k, r) {
+    if (!r || !r.length) return '';
+    var ks = Object.keys(r[0]).filter(function (c) { return r.some(function (x) { return x[c] != null && x[c] !== '' && typeof x[c] !== 'object'; }); });
+    if (!ks.length) return '';
+    var nc = {}; ks.forEach(function (c) { nc[c] = !CODE.test(c) && !/^\d{4}-\d\d-\d\d/.test(String(r[0][c])) && r.every(function (x) { return x[c] == null || x[c] === '' || isNumV(x[c]); }) && r.some(function (x) { return isNumV(x[c]); }); });
+    S.more = S.more || {}; var lim = 50 * (1 + (S.more[k] || 0)), shown = r.slice(0, lim);
+    var th = ks.map(function (c) { return '<th' + (nc[c] ? '' : ' class="l"') + '>' + esc(colLbl(c)) + '</th>'; }).join('');
+    var tr = shown.map(function (x) { return '<tr>' + ks.map(function (c) { return '<td' + (nc[c] ? '' : ' class="l"') + '>' + cellV(c, x[c], nc[c]) + '</td>'; }).join('') + '</tr>'; }).join('');
+    return '<div class="card"><h4>Detail data <span class="sm" style="font-weight:400">· ' + n(r.length) + ' baris</span></h4><div class="btw"><table class="dt"><thead><tr>' + th + '</tr></thead><tbody>' + tr + '</tbody></table></div>' +
+      '<div class="sm">Geser ke samping untuk melihat semua kolom.' + (r.length > shown.length ? ' Menampilkan ' + n(shown.length) + ' dari ' + n(r.length) + ' baris.' : '') + '</div>' +
+      (r.length > shown.length ? '<button class="chip" style="margin-top:10px" data-a="more" data-k="' + esc(k) + '">Tampilkan 50 lagi</button>' : '') + '</div>';
+  }
+  function detailSec() {
+    var k = S.sub, r = rows(k === 'peta' ? petaKey() : k);
+    if (!r.length || (k === 'biaya_carton' && r[0].bulan)) return '';
+    return detailTable(k, detRows(k, r));
+  }
   function an() {
-    var s = anBody(), P1 = '<select class="dd" data-sk', i = s.indexOf(P1); if (i < 0) return s;
+    var s = anBody() + detailSec(), P1 = '<select class="dd" data-sk', i = s.indexOf(P1); if (i < 0) return s;
     var j = s.indexOf('</select>', i) + 9, e = s.indexOf('</select>', j) + 9;
     if (s.indexOf('<select class="dd" data-pk', j) === j && e > j) return s.slice(0, i) + '<div class="ddrow">' + s.slice(i, e) + '</div>' + s.slice(e);
     return s.slice(0, i) + '<div class="ddrow">' + s.slice(i, j) + '</div>' + s.slice(j);
@@ -807,6 +853,7 @@
     else if (t.dataset.s) { S.sub = t.dataset.s; render(); ens(); }
     else if (t.dataset.a === 'reload') load();
     else if (t.dataset.a === 'retry') secLoad(S.sub, 1);
+    else if (t.dataset.a === 'more') { S.more = S.more || {}; S.more[t.dataset.k] = (S.more[t.dataset.k] || 0) + 1; render(); }
     else if (t.dataset.a === 'stk') stkLoad(1);
     else if (t.dataset.a === 'fef') fefLoad(1);
     else if (t.dataset.a === 'dim') dimLoad(1);

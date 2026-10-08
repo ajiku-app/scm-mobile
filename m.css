@@ -322,3 +322,12 @@ html,body{background:var(--bg);background-image:none;color:var(--ink)}
 .card code{background:#F0ECEB}
 .bs0{color:#8A8185;background:#F0ECEB}.tgl i{border-top-color:rgba(60,40,44,.5)}
 .mtb u{border-left-color:rgba(60,40,44,.6)}
+
+/* tabel detail generik (Analisis) */
+.dt{width:100%;border-collapse:collapse;font-size:12px;font-variant-numeric:tabular-nums}
+.dt th{text-align:right;font-weight:600;color:var(--m);padding:8px 10px;border-bottom:1px solid var(--ln);white-space:nowrap}
+.dt td{text-align:right;padding:10px;border-top:1px solid var(--ln);white-space:nowrap}
+.dt th.l,.dt td.l{text-align:left}
+.dt td.l{white-space:normal;min-width:110px;max-width:240px}
+.dt th:first-child,.dt td:first-child{position:sticky;left:0;background:var(--c);z-index:1;text-align:left;font-weight:600}
+.dt tbody tr:nth-child(even) td{background:#FBFAF9}.dt tbody tr:nth-child(even) td:first-child{background:#FBFAF9}
