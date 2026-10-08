@@ -638,7 +638,7 @@
     // grafik batang
     var W = 340, H = 232, T = 26, B = 50, pad = 6, m = rs.length, sl = (W - pad * 2) / m, bw = Math.min(30, sl * 0.62), mx = Math.max.apply(0, ok.map(function (x) { return Number(x.biaya_per_carton); }).concat([tg || 0])) * 1.12, base = H - B;
     var Y = function (v) { return base - v / mx * (base - T); }, o = '';
-    if (tg) o += '<line x1="' + pad + '" x2="' + (W - pad) + '" y1="' + Y(tg) + '" y2="' + Y(tg) + '" stroke="rgba(255,255,255,.45)" stroke-dasharray="4 4"/><text x="' + (W - pad) + '" y="' + (Y(tg) - 4) + '" text-anchor="end" font-size="9" fill="#C9CFF0">Target Rp ' + n(tg, 0) + '</text>';
+    if (tg) o += '<line x1="' + pad + '" x2="' + (W - pad) + '" y1="' + Y(tg) + '" y2="' + Y(tg) + '" stroke="rgba(255,255,255,.45)" stroke-dasharray="4 4"/>';
     o += '<line x1="' + pad + '" x2="' + (W - pad) + '" y1="' + base + '" y2="' + base + '" stroke="rgba(255,255,255,.15)"/>';
     rs.forEach(function (x, i) {
       var cx = pad + sl * i + sl / 2, has = bOk(x), c = BST[x.status_efisiensi] || '#6FA8FF', v = has ? Number(x.biaya_per_carton) : 0, y = Y(v);
@@ -646,7 +646,7 @@
         (has ? '<rect x="' + (cx - bw / 2) + '" y="' + y + '" width="' + bw + '" height="' + (base - y) + '" rx="4" fill="' + c + '" fill-opacity=".92"/><text x="' + cx + '" y="' + (y - 5) + '" text-anchor="middle" font-size="9.5" font-weight="700" fill="#fff">' + n(v, 0) + '</text>' : '<text x="' + cx + '" y="' + (base - 6) + '" text-anchor="middle" font-size="12" fill="#9AA3D6">—</text>') +
         '<text x="' + cx + '" y="' + (base + 14) + '" text-anchor="middle" font-size="9" fill="#C9CFF0">' + esc(bShort(x.bulan).replace(' ', ' ')) + '</text><text x="' + cx + '" y="' + (base + 27) + '" text-anchor="middle" font-size="8" font-weight="700" fill="' + (has ? c : '#6B74A8') + '">' + (has ? esc(x.status_efisiensi || '') : '') + '</text><rect x="' + (cx - sl / 2) + '" y="0" width="' + sl + '" height="' + H + '" fill="transparent"/></g>';
     });
-    var chart = '<div class="card"><h4>Biaya per karton per bulan (Rp)</h4><svg class="ar" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Grafik biaya per karton per bulan">' + o + '</svg><div class="sm">Ketuk batang atau baris bulan untuk melihat detail.</div></div>';
+    var chart = '<div class="card"><h4>Biaya per karton per bulan (Rp)</h4><svg class="ar" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Grafik biaya per karton per bulan">' + o + '</svg><div class="sm clg"><span>Ketuk batang atau baris bulan untuk melihat detail.</span>' + (tg ? '<span class="tgl"><i></i>Target Rp ' + n(tg, 0) + '</span>' : '') + '</div></div>';
     // tabel detail per bulan (format sama dengan dashboard desktop)
     var trs = rs.map(function (x) {
       var has = bOk(x), c = BST[x.status_efisiensi] || '#9AA3D6', p = Number(x.pct_dari_target), key = esc(String(x.bulan).slice(0, 10));

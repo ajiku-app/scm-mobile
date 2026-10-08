@@ -266,3 +266,6 @@ svg.ar g:focus-visible{outline:2px solid #FFA11E}
 .bs0{color:#9AA3D6;background:rgba(255,255,255,.08)}
 
 .ins{margin:0;padding-left:18px;font-size:13px;line-height:1.6}.ins li{margin:0 0 10px}.ins li::marker{color:var(--m)}.ins b{font-weight:700}
+
+.clg{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.tgl{display:inline-flex;align-items:center;gap:6px;white-space:nowrap;color:#C9CFF0;font-weight:600}.tgl i{display:inline-block;width:16px;border-top:2px dashed rgba(255,255,255,.55)}
