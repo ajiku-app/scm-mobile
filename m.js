@@ -140,6 +140,36 @@
     return l ? l.replace(/[._-]+/g, ' ').replace(/\b\w/g, function (c) { return c.toUpperCase(); }) : 'pengguna';
   }
   function tg(t) { var k = /krit|high|tinggi/i.test(t) ? 'bad' : /peringat|warn|sedang/i.test(t) ? 'warn' : ''; return '<span class="chip ' + k + '">' + esc(t) + '</span>'; }
+  // ---------- Grafik interaktif: klik grafik -> tabel detail (modal) ----------
+  var CD = {}, cdn = 0;
+  function cdReg(cols, rows, opt) { var id = 'c' + (++cdn); CD[id] = { cols: cols, rows: rows, opt: opt || {} }; return id; }
+  function cw(id, inner) { return '<div class="cw" data-cd="' + id + '" role="button" tabindex="0" aria-label="Lihat detail data grafik dalam tabel">' + inner + '</div>'; }
+  function cdTable(cd, hi) {
+    var R = cd.rows, idx = [], i, o = cd.opt || {};
+    if (o.win) { var st = hi != null ? Math.max(0, Math.min(R.length - 10, hi - 5)) : Math.max(0, R.length - 10); for (i = st; i < Math.min(R.length, st + 10); i++) idx.push(i); }
+    else { for (i = 0; i < Math.min(10, R.length); i++) idx.push(i); if (hi != null && idx.indexOf(hi) < 0) idx.push(hi); }
+    var NUM = /^(Rp\s)?[-+]?[\d.,]+(\s?[%A-Za-zµ³²\/]*)?$/, nc = cd.cols.map(function (c, j) { return j > 0 && R.every(function (r) { return r[j] == null || r[j] === '' || r[j] === '—' || NUM.test(String(r[j])); }); });
+    var th = cd.cols.map(function (c, j) { return '<th' + (nc[j] ? '' : ' class="l"') + '>' + esc(c) + '</th>'; }).join('');
+    var tr = idx.map(function (k) { return '<tr' + (k === hi ? ' class="hi"' : '') + '>' + R[k].map(function (v, j) { return '<td' + (nc[j] ? '' : ' class="l"') + '>' + esc(v == null || v === '' ? '—' : v) + '</td>'; }).join('') + '</tr>'; }).join('');
+    return '<div class="btw"><table class="dt"><thead><tr>' + th + '</tr></thead><tbody>' + tr + '</tbody></table></div>';
+  }
+  function cdSub(cd, hi) {
+    var o = cd.opt || {}, N = cd.rows.length;
+    if (o.win) return hi != null ? '10 data di sekitar titik yang dipilih' : '10 data terbaru';
+    return '10 data teratas' + (N > 10 ? ' dari ' + n(N) + ' baris' : '') + (hi != null && hi >= 10 ? ' · ditambah item yang dipilih' : '');
+  }
+  function openCD(t, e) {
+    var cd = CD[t.dataset.cd]; if (!cd) return;
+    var hi = null, it = e && e.target && e.target.closest ? e.target.closest('[data-i]') : null;
+    if (it && t.contains(it)) hi = Number(it.dataset.i);
+    else if (cd.opt.area && e && e.clientX != null && e.target.closest && e.target.closest('svg.ar')) {
+      var sv = t.querySelector('svg.ar'), rc = sv.getBoundingClientRect(), m = cd.rows.length, x = (e.clientX - rc.left) / rc.width * 320;
+      hi = Math.max(0, Math.min(m - 1, Math.round((x - 10) / 300 * (m - 1))));
+    }
+    var card = t.closest('.card'), h = card && card.querySelector('h4');
+    S.mdl = { k: 'cd', t: '', cd: { title: h ? h.textContent.replace(/\s+/g, ' ').trim() : 'Detail data', cols: cd.cols, rows: cd.rows, opt: cd.opt, hi: hi } };
+    mdlSync();
+  }
   function gauge(v, color) {
     var C = 2 * Math.PI * 44, a = C * 0.75, f = isFinite(v) ? a * Math.min(100, Math.max(0, v)) / 100 : 0;
     return '<svg class="gauge" viewBox="0 0 120 120"><g transform="rotate(135 60 60)"><circle cx="60" cy="60" r="44" fill="none" stroke="rgba(255,255,255,.14)" stroke-width="12" stroke-linecap="round" stroke-dasharray="' + a + ' ' + C + '"/><circle cx="60" cy="60" r="44" fill="none" stroke="' + color + '" stroke-width="12" stroke-linecap="round" stroke-dasharray="' + f + ' ' + C + '"/></g><text x="60" y="66" text-anchor="middle" font-size="22" font-weight="600" fill="#fff">' + (isFinite(v) ? Math.round(v) : '-') + '</text></svg>';
@@ -174,11 +204,16 @@
     parts = parts.filter(function (p) { return p.v > 0; });
     var tot = parts.reduce(function (a, p) { return a + p.v; }, 0), C = 2 * Math.PI * 38, off = 0;
     if (!tot) return '<div class="sm">Belum ada data.</div>';
-    var segs = parts.map(function (p) { var l = C * p.v / tot, s = '<circle cx="50" cy="50" r="38" fill="none" stroke="' + p.c + '" stroke-width="12" stroke-dasharray="' + Math.max(0, l - 2) + ' ' + (C - l + 2) + '" stroke-dashoffset="' + -off + '" transform="rotate(-90 50 50)"/>'; off += l; return s; }).join('');
-    return '<div class="dn"><svg width="120" height="120" viewBox="0 0 100 100" style="flex:none"><circle cx="50" cy="50" r="38" fill="none" stroke="rgba(60,40,44,.08)" stroke-width="12"/>' + segs + '<text x="50" y="55" text-anchor="middle" font-size="15" font-weight="600" fill="#fff">' + esc(center) + '</text></svg><div class="lg">' +
-      parts.map(function (p) { return '<div><i style="background:' + p.c + '"></i><span>' + esc(p.l) + '</span><b>' + n(p.v) + '</b></div>'; }).join('') + '</div></div>';
+    var idD = cdReg(['Kategori', 'Jumlah', 'Porsi'], parts.map(function (p) { return [p.l, n(p.v), n(p.v / tot * 100, 1) + '%']; }));
+    var segs = parts.map(function (p, pi) { var l = C * p.v / tot, s = '<circle data-i="' + pi + '" cx="50" cy="50" r="38" fill="none" stroke="' + p.c + '" stroke-width="12" stroke-dasharray="' + Math.max(0, l - 2) + ' ' + (C - l + 2) + '" stroke-dashoffset="' + -off + '" transform="rotate(-90 50 50)"/>'; off += l; return s; }).join('');
+    return cw(idD, '<div class="dn"><svg width="120" height="120" viewBox="0 0 100 100" style="flex:none"><circle cx="50" cy="50" r="38" fill="none" stroke="rgba(60,40,44,.08)" stroke-width="12"/>' + segs + '<text x="50" y="55" text-anchor="middle" font-size="15" font-weight="600" fill="#2B2325">' + esc(center) + '</text></svg><div class="lg">' +
+      parts.map(function (p, pi) { return '<div data-i="' + pi + '"><i style="background:' + p.c + '"></i><span>' + esc(p.l) + '</span><b>' + n(p.v) + '</b></div>'; }).join('') + '</div></div>');
   }
   function area(vals, labs, c) {
+    var h = areaRaw(vals, labs, c); if (!h) return h;
+    return cw(cdReg(['Periode', 'Nilai'], vals.map(function (v, i) { return [labs && labs[i] != null ? labs[i] : String(i + 1), n(v, Number.isInteger(Number(v)) ? 0 : 1)]; }), { win: 1, area: 1 }), h);
+  }
+  function areaRaw(vals, labs, c) {
     if (vals.length < 2) return '';
     var W = 320, H = 130, p = 10, id = 'g' + (++uid), hi = Math.max.apply(0, vals), lo = Math.min.apply(0, vals), sp = hi - lo || 1, m = vals.length;
     var X = function (i) { return p + i * (W - 2 * p) / (m - 1); }, Y = function (v) { return H - p - (v - lo) / sp * (H - 2 * p - 26); };
@@ -188,10 +223,12 @@
   }
   function vbars(items) {   // items: [label, nilai]
     var mx = Math.max.apply(0, items.map(function (x) { return x[1]; })) || 1, top = items.reduce(function (a, x, i) { return x[1] > items[a][1] ? i : a; }, 0);
-    return '<div class="vb">' + items.map(function (x, i) { return '<div' + (i === top ? ' class="hi"' : '') + '>' + (i === top ? n(x[1]) : '') + '<i style="height:' + Math.max(4, x[1] / mx * 100) + '%"></i>' + esc(String(x[0]).slice(0, 5)) + '</div>'; }).join('') + '</div>';
+    var id = cdReg(['Kategori', 'Nilai'], items.map(function (x) { return [x[0], n(x[1], Number.isInteger(Number(x[1])) ? 0 : 1)]; }));
+    return cw(id, '<div class="vb">' + items.map(function (x, i) { return '<div' + (i === top ? ' class="hi"' : '') + ' data-i="' + i + '">' + (i === top ? n(x[1]) : '') + '<i style="height:' + Math.max(4, x[1] / mx * 100) + '%"></i>' + esc(String(x[0]).slice(0, 5)) + '</div>'; }).join('') + '</div>');
   }
   function hbars(items, c) {   // items: [label, nilai, teks, lebar%]
-    return items.map(function (x) { return '<div class="hb"><div class="row"><span>' + esc(x[0]) + '</span><b>' + esc(x[2]) + '</b></div><div class="bar"><i style="width:' + Math.max(2, Math.min(100, x[3])) + '%;background:linear-gradient(90deg,' + c + 'AA,' + c + ')"></i></div></div>'; }).join('');
+    var id = cdReg(['Indikator', 'Nilai'], items.map(function (x) { return [x[0], x[2]]; }));
+    return cw(id, items.map(function (x, i) { return '<div class="hb" data-i="' + i + '"><div class="row"><span>' + esc(x[0]) + '</span><b>' + esc(x[2]) + '</b></div><div class="bar"><i style="width:' + Math.max(2, Math.min(100, x[3])) + '%;background:linear-gradient(90deg,' + c + 'AA,' + c + ')"></i></div></div>'; }).join(''));
   }
   function sum(rows, f) { return rows.reduce(function (a, r) { return a + (Number(f(r)) || 0); }, 0); }
   function group(rows, kf, vf) { var o = {}, ks = []; rows.forEach(function (r) { var k = kf(r); if (!(k in o)) { o[k] = 0; ks.push(k); } o[k] += vf ? Number(vf(r)) || 0 : 1; }); return ks.map(function (k) { return [k, o[k]]; }); }
@@ -231,11 +268,10 @@
     return hd + fn(r);
   }
   function home() {
-    var vs = ['stock', 'logistics', 'fefo'].map(function (k) { var d = zone(k); return d ? Number(Z[k].main(d)) : NaN; }).filter(isFinite);
-    var sc = vs.length ? vs.reduce(function (a, b) { return a + b; }, 0) / vs.length : NaN, al4 = (S.an && S.an.peringatan || []).slice(0, 4), ac = S.an && S.an.peringatan ? S.an.peringatan.length : 0;
-    return head('SCM Tower', S.at ? (S.stale ? 'Data tersimpan ' : 'Disinkron pukul ') + S.at : 'Memuat data...') +
-      (S.busy ? pgHtml(['stock', 'logistics', 'fefo', 'warehouse', 'armada', 'peringatan'], 'Memuat data') : '') + '<div class="chips"><span class="chip">' + esc(todayLbl()) + '</span>' + status() + '<span class="chip good">Selamat datang : ' + esc(dispName()) + '</span></div>' +
-      '<div class="sum"><div class="s1"><small>Skor operasional</small><b>' + (isFinite(sc) ? Math.round(sc) + '%' : '-') + '</b></div><i class="vl"></i><button class="s2" data-v="an" data-s="peringatan"><small>Peringatan</small><b>' + n(ac) + '</b></button></div>' + errNote() +
+    var al4 = (S.an && S.an.peringatan || []).slice(0, 4);
+    return head('SCM Tower', todayLbl() + ' · ' + (S.at ? (S.stale ? 'Data tersimpan ' : 'Disinkron pukul ') + S.at : 'Memuat data...')) +
+      (S.busy ? pgHtml(['stock', 'logistics', 'fefo', 'warehouse', 'armada', 'peringatan'], 'Memuat data') : '') + '<div class="chips">' + status() + '<span class="chip good">Selamat datang : ' + esc(dispName()) + '</span></div>' +
+      errNote() +
       Object.keys(Z).map(zc).join('') +
       '<div class="tiles">' + PICK.map(function (p) { var d = zone(p[0]), x = Z[p[0]].k[p[1]], v = d && x[1](d); return d && v != null && isFinite(Number(v)) ? tile(x[0], x[2](v, d)) : ''; }).join('') + '</div>' +
       armadaCharts() + alertDonut() + '<div class="trh"><span>Peringatan:</span><button data-v="an" data-s="peringatan">Lihat semua</button></div>' +
@@ -338,7 +374,8 @@
     P.forEach(function (p, j) { var x = X(p[0]), y = Y(p[1]); if (g.res[j] < -g.sd) { out++; pts += '<rect x="' + (x - 3.6) + '" y="' + (y - 3.6) + '" width="7.2" height="7.2" fill="#B5474B"><title>' + esc(p[2]) + '</title></rect>'; } else pts += '<circle cx="' + x + '" cy="' + y + '" r="3.6" fill="#7D8FA9" fill-opacity=".9"><title>' + esc(p[2]) + '</title></circle>'; });
     var x1 = Math.min.apply(0, P.map(function (p) { return p[0]; })), x2 = Math.max.apply(0, P.map(function (p) { return p[0]; }));
     o += '<line x1="' + X(x1) + '" y1="' + Y(g.a + g.b * x1) + '" x2="' + X(x2) + '" y2="' + Y(g.a + g.b * x2) + '" stroke="#C0504D" stroke-width="2" stroke-dasharray="6 4"/>' + pts;
-    return head4 + '<div class="lgd"><span><i style="background:#7D8FA9;border-radius:50%"></i>SKU (normal)</span><span><i style="background:#B5474B"></i>SKU outlier (slow-moving)</span><span><i style="background:none;border-top:2px dashed #C0504D;height:0;width:16px"></i>Tren regresi linear</span></div><svg class="ar" viewBox="0 0 ' + W + ' ' + H + '">' + o + '</svg><div class="rg2"><span class="bad">▬ Tren regresi linear · R² = ' + g.r2.toFixed(3).replace('.', ',') + '</span><span class="sm">' + n(P.length) + ' SKU · ' + n(out) + ' outlier</span></div><div class="sm" style="margin-top:6px">Persamaan: y = ' + n(g.b, 3) + 'x ' + (g.a < 0 ? '− ' : '+ ') + n(Math.abs(g.a), 0) + '</div></div>';
+    var cdS = cdReg(['SKU / Item', 'Stok hari ini', 'Total kebutuhan', 'Status'], P.map(function (p, j) { return [p[2], n(p[0]), n(p[1]), g.res[j] < -g.sd ? 'Outlier (slow-moving)' : 'Normal']; }).sort(function (a, b) { return (a[3] === 'Normal') - (b[3] === 'Normal'); }));
+    return head4 + '<div class="lgd"><span><i style="background:#7D8FA9;border-radius:50%"></i>SKU (normal)</span><span><i style="background:#B5474B"></i>SKU outlier (slow-moving)</span><span><i style="background:none;border-top:2px dashed #C0504D;height:0;width:16px"></i>Tren regresi linear</span></div>' + cw(cdS, '<svg class="ar" viewBox="0 0 ' + W + ' ' + H + '">' + o + '</svg>') + '<div class="rg2"><span class="bad">▬ Tren regresi linear · R² = ' + g.r2.toFixed(3).replace('.', ',') + '</span><span class="sm">' + n(P.length) + ' SKU · ' + n(out) + ' outlier</span></div><div class="sm" style="margin-top:6px">Persamaan: y = ' + n(g.b, 3) + 'x ' + (g.a < 0 ? '− ' : '+ ') + n(Math.abs(g.a), 0) + '</div></div>';
   }
 
 
@@ -411,7 +448,8 @@
     o += '<text x="' + (L + (W - L - R) / 2) + '" y="' + (H - 4) + '" text-anchor="middle" font-size="9.5" fill="#8A8185">Bulan posting</text><text transform="translate(10 ' + (T + (H - T - B) / 2) + ') rotate(-90)" text-anchor="middle" font-size="9.5" fill="#8A8185">Rata² bulan kedaluwarsa (SLED)</text>';
     if (fit) { var d = '', x; for (i = 0; i <= 60; i++) { x = Math.min(xs[0], xs[0]) + (xs[xs.length - 1] - xs[0]) * i / 60; d += (i ? 'L' : 'M') + X(x).toFixed(1) + ' ' + Y(fit.f(x)).toFixed(1); } o += '<path d="' + d + '" fill="none" stroke="#C0504D" stroke-width="2" stroke-dasharray="6 4"/>'; }
     P.forEach(function (p) { o += '<circle cx="' + X(p[0]) + '" cy="' + Y(p[1]) + '" r="4.6" fill="#7D8FA9"><title>' + esc(sel.b === 'all' ? monLbl(p[2]) : p[2]) + ' · ' + n(p[3]) + ' ctn · expired rata-rata ' + dayLbl(p[1]) + '</title></circle>'; });
-    h += '<div class="lgd"><span><i style="background:#7D8FA9;border-radius:50%"></i>Posting vs Expired (aktual)</span><span><i style="background:none;border-top:2px dashed #C0504D;height:0;width:16px"></i>Tren regresi (derajat 2)</span></div><svg class="ar" viewBox="0 0 ' + W + ' ' + H + '">' + o + '</svg>' +
+    var cdF = cdReg([sel.b === 'all' ? 'Bulan posting' : 'SKU', 'Qty (ctn)', 'Rata² posting', 'Rata² kedaluwarsa (SLED)'], P.slice().sort(function (a, b) { return b[3] - a[3]; }).map(function (p) { return [sel.b === 'all' ? monLbl(p[2]) : p[2], n(p[3]), dayLbl(p[0]), dayLbl(p[1])]; }));
+    h += '<div class="lgd"><span><i style="background:#7D8FA9;border-radius:50%"></i>Posting vs Expired (aktual)</span><span><i style="background:none;border-top:2px dashed #C0504D;height:0;width:16px"></i>Tren regresi (derajat 2)</span></div>' + cw(cdF, '<svg class="ar" viewBox="0 0 ' + W + ' ' + H + '">' + o + '</svg>') +
       '<div class="rg2"><span class="bad">▬ Tren regresi polinomial (derajat 2)' + (fit ? ' · R² = ' + fit.r2.toFixed(3).replace('.', ',') : ' · butuh minimal 4 titik') + '</span></div>' +
       '<div class="sm" style="margin-top:6px">Rata-rata bulan kedaluwarsa (SLED) terhadap bulan posting, dengan tren regresi. ' + (sel.b === 'all' ? 'Satu titik = satu bulan posting.' : 'Satu titik = satu SKU pada bulan terpilih.') + '</div></div>';
     return '<div class="kps">' + cards.join('') + '</div>' + note + h;
@@ -471,11 +509,13 @@
     return { title: titles[key], sub: 'Top 10 data teratas · sumber ' + esc(T.st.table || 'v_stok_terbaru'), tabs: tabs, start: start };
   }
   function mdlSpec() {
+    if (S.mdl && S.mdl.cd) return { title: S.mdl.cd.title, sub: cdSub(S.mdl.cd, S.mdl.cd.hi), tbl: cdTable(S.mdl.cd, S.mdl.cd.hi), note: 'Geser ke samping untuk melihat semua kolom.' };
     var k = S.mdl && S.mdl.k; if (!k) return null;
     var sp = k.charAt(0) === 'f' ? fefSpec(k) : k.charAt(0) === 'l' ? logSpec(k) : k.charAt(0) === 'b' ? bizSpec(k) : stkSpec(k); return sp;
   }
   function mdlHtml(sp) {
     var head = '<div class="mhd"><div><h3 id="mdlT">' + esc(sp.title || (S.mdl.k.charAt(0) === 'f' ? 'Detail FEFO' : S.mdl.k.charAt(0) === 'l' ? 'Detail logistik' : 'Detail stok')) + '</h3><small>' + (sp.sub || 'Top 10 data teratas') + '</small></div><button class="mcl" data-mx="1" aria-label="Tutup">×</button></div>';
+    if (sp.tbl) return head + '<div class="mbd">' + sp.tbl + '</div><div class="mft">' + esc(sp.note || '') + '</div>';
     if (sp.kv) {
       var mt = sp.meter ? '<div class="mtr"><div class="mtb"><i style="width:' + Math.max(2, Math.min(100, sp.meter.p / 160 * 100)).toFixed(1) + '%;background:' + sp.meter.c + '"></i><u style="left:' + (90 / 160 * 100) + '%"></u><u style="left:' + (110 / 160 * 100) + '%"></u></div><div class="mtl"><span>0%</span><span>90%</span><span>110%</span><span>160%+</span></div></div>' : '';
       return head + '<div class="mbd">' + mt + sp.kv.map(function (p) { return '<div class="kvr"><span>' + esc(p[0]) + '</span><b>' + p[1] + '</b></div>'; }).join('') + '</div><div class="mft">' + (sp.note || '') + '</div>';
@@ -535,10 +575,11 @@
     return { list: arr, avg: arr.length ? tot / arr.length : 0 };
   }
   function stackRows(rows, segs, mx, avg) {
-    return rows.map(function (o) {
+    var id = cdReg(['Nama'].concat(segs.map(function (sg) { return sg.l; }), ['Total']), rows.slice().sort(function (a, b) { return b.t - a.t; }).map(function (o) { return [o.nama].concat(segs.map(function (sg) { return n(o.seg[sg.k] || 0); }), [n(o.t)]); }));
+    return cw(id, rows.map(function (o, oi) {
       var bar = segs.map(function (sg) { var v = o.seg[sg.k] || 0; return v ? '<i style="width:' + (v / mx * 100).toFixed(2) + '%;background:' + sg.c + '" title="' + esc(sg.l) + ': ' + v + '"></i>' : ''; }).join('');
       return '<div class="wr"><span class="wn">' + esc(o.nama) + '</span><div class="wt"><div class="wb">' + bar + '</div><u class="avg" style="left:' + (avg / mx * 100).toFixed(2) + '%"></u></div><b>' + n(o.t) + '</b></div>';
-    }).join('');
+    }).join(''));
   }
   function legend(segs, avg) { return '<div class="lgd">' + segs.map(function (sg) { return '<span><i style="background:' + sg.c + '"></i>' + esc(sg.l) + '</span>'; }).join('') + '<span><i style="background:none;border-top:2px dashed #fff;height:0;width:16px"></i>Rata-rata beban kerja (' + n(avg, 1) + ')</span></div>'; }
   function topBlock(title, ico, R) {
@@ -828,6 +869,7 @@
     return head('Profil', 'Akun & pengaturan', 1) + '<div class="card"><div class="av">' + esc((S.email[0] || 'U').toUpperCase()) + '</div><div class="sm">Masuk sebagai</div><b>' + esc(S.email || '-') + '</b></div><div class="card pf"><button data-a="reload"><span>Muat ulang data</span>' + ic('chev') + '</button><a href="' + DESKTOP_URL + '"><span>Buka versi desktop</span>' + ic('chev') + '</a><button data-a="out" class="bad"><span>Keluar</span>' + ic('chev') + '</button></div>';
   }
   function render() {
+    CD = {}; cdn = 0;
     $('main').innerHTML = S.v === 'home' ? home() : S.v === 'an' ? an() : S.v === 'fc' ? forecast() : S.v === 'me' ? me() : detail(S.v.slice(2));
     var on = function (v) { return S.v === v ? ' class="on"' : ''; };
     var NAV = [['home', 'home', 'Dashboard'], ['an', 'chart', 'Analysis'], ['z:fefo', 'clock', 'Fefo'], ['z:stock', 'box', 'Monitoring'], ['z:logistics', 'truck', 'Logistik'], ['fc', 'trend', 'Forecast']];
@@ -843,9 +885,10 @@
     else if (t.dataset.fk) { S.fsel = S.fsel || { b: 'all', i: 'all' }; S.fsel[t.dataset.fk] = t.value; render(); }
   });
   document.addEventListener('click', function (e) {
-    var t = e.target.closest('[data-m],[data-mt],[data-mx],[data-v],[data-s],[data-a],[data-p]'); if (!t) return;
+    var t = e.target.closest('[data-m],[data-mt],[data-mx],[data-v],[data-s],[data-a],[data-p],[data-cd]'); if (!t) return;
     if (t.dataset.mx) { S.mdl = null; mdlSync(); return; }
     if (t.dataset.mt) { if (S.mdl) { S.mdl.t = t.dataset.mt; mdlSync(); } return; }
+    if (t.dataset.cd) { openCD(t, e); return; }
     if (t.dataset.m) { openM(t.dataset.m); return; }
     if (t.dataset.p) { var pp = t.dataset.p.split('|'); S.pk[pp[0]] = pp.slice(1).join('|'); render(); }
     else if (t.dataset.v) { if (t.dataset.s) S.sub = t.dataset.s; S.v = t.dataset.v; render(); window.scrollTo(0, 0); ens(); }
@@ -862,6 +905,7 @@
   document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape' && S.mdl) { S.mdl = null; mdlSync(); return; }
     if ((e.key === 'Enter' || e.key === ' ') && e.target.closest && e.target.closest('[role="button"][data-m]')) { e.preventDefault(); openM(e.target.closest('[data-m]').dataset.m); }
+    else if ((e.key === 'Enter' || e.key === ' ') && e.target.closest && e.target.closest('[role="button"][data-cd]')) { e.preventDefault(); openCD(e.target.closest('[data-cd]'), { target: e.target }); }
   });
   document.addEventListener('visibilitychange', function () { if (!document.hidden && Date.now() - (S.last || 0) > 60000) load(); });
   restore(); render(); load();

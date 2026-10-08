@@ -331,3 +331,11 @@ html,body{background:var(--bg);background-image:none;color:var(--ink)}
 .dt td.l{white-space:normal;min-width:110px;max-width:240px}
 .dt th:first-child,.dt td:first-child{position:sticky;left:0;background:var(--c);z-index:1;text-align:left;font-weight:600}
 .dt tbody tr:nth-child(even) td{background:#FBFAF9}.dt tbody tr:nth-child(even) td:first-child{background:#FBFAF9}
+
+/* grafik interaktif -> tabel detail */
+.cw{position:relative;cursor:pointer;padding-bottom:22px;-webkit-tap-highlight-color:transparent;border-radius:12px}
+.cw::after{content:'Ketuk grafik untuk tabel detail';position:absolute;right:0;bottom:0;font-size:10.5px;color:var(--m);pointer-events:none}
+.cw:hover,.cw:focus-visible{background:rgba(169,69,72,.04)}.cw:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
+.cw [data-i]{cursor:pointer;transition:opacity .15s}.cw [data-i]:hover{opacity:.75}
+.dt tbody tr.hi td{background:var(--ac2);font-weight:700}
+.msh .dt{font-size:12.5px}
