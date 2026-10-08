@@ -36,8 +36,8 @@
       ['Pengiriman / hari', function (d) { return d.avg_shipment_per_day; }, function (v) { return n(v, 1); }], ['Tenaga / pengiriman', function (d) { return d.avg_crew_size; }, function (v) { return n(v, 1); }],
       ['Petugas teraktif', function (d) { return d.top_karyawan_jumlah; }, function (v) { return n(v) + 'x'; }], ['Kendaraan muat / hari', function (d) { return d.req_kendaraan_muat_per_hari; }, unit]] }
   };
-  var PAL = ['#FFA11E', '#FF3D81', '#4F7BFF', '#FFD23F', '#9A86FF', '#35D0BA'];
-  var COL = { stock: '#FF3D81', logistics: '#FFA11E', fefo: '#4F7BFF', warehouse: '#35D0BA' };
+  var PAL = ['#B5474B', '#B5474B', '#7D8FA9', '#C9A24A', '#9488A8', '#6BA38C'];
+  var COL = { stock: '#B5474B', logistics: '#B5474B', fefo: '#7D8FA9', warehouse: '#6BA38C' };
   var PICK = [['stock', 3], ['stock', 4], ['logistics', 2], ['logistics', 3], ['fefo', 1], ['warehouse', 2]];
   var SEC = [['armada', 'Armada'], ['prioritas', 'Prioritas'], ['peringatan', 'Peringatan'], ['kendaraan', 'Kendaraan'], ['prediksi', 'Prediksi'], ['stok_vs_kirim', 'Stok vs Kirim'], ['tren', 'Tren'], ['harian', 'Harian'], ['durasi_ringkas', 'Durasi truk'], ['shipments_ringkas', 'Pengiriman'], ['pareto', 'Pareto'], ['biaya_carton', 'Biaya'], ['estimasi_budget', 'Budget'], ['sku_belum_master', 'Data master'], ['peta', 'Peta']];
 
@@ -167,14 +167,14 @@
   // ---------- grafik (SVG/CSS murni, tanpa library) ----------
   function ring(v, c, sz, txt) {
     var C = 2 * Math.PI * 40, f = isFinite(v) ? C * Math.min(100, Math.max(0, v)) / 100 : 0;
-    return '<svg width="' + sz + '" height="' + sz + '" viewBox="0 0 100 100" style="flex:none"><circle cx="50" cy="50" r="40" fill="none" stroke="rgba(255,255,255,.12)" stroke-width="10"/><circle cx="50" cy="50" r="40" fill="none" stroke="' + c + '" stroke-width="10" stroke-linecap="round" stroke-dasharray="' + f + ' ' + C + '" transform="rotate(-90 50 50)"/><text x="50" y="57" text-anchor="middle" font-size="24" font-weight="600" fill="#fff">' + (txt || (isFinite(v) ? Math.round(v) : '-')) + '</text></svg>';
+    return '<svg width="' + sz + '" height="' + sz + '" viewBox="0 0 100 100" style="flex:none"><circle cx="50" cy="50" r="40" fill="none" stroke="rgba(60,40,44,.10)" stroke-width="10"/><circle cx="50" cy="50" r="40" fill="none" stroke="' + c + '" stroke-width="10" stroke-linecap="round" stroke-dasharray="' + f + ' ' + C + '" transform="rotate(-90 50 50)"/><text x="50" y="57" text-anchor="middle" font-size="24" font-weight="600" fill="#fff">' + (txt || (isFinite(v) ? Math.round(v) : '-')) + '</text></svg>';
   }
   function donut(parts, center) {
     parts = parts.filter(function (p) { return p.v > 0; });
     var tot = parts.reduce(function (a, p) { return a + p.v; }, 0), C = 2 * Math.PI * 38, off = 0;
     if (!tot) return '<div class="sm">Belum ada data.</div>';
     var segs = parts.map(function (p) { var l = C * p.v / tot, s = '<circle cx="50" cy="50" r="38" fill="none" stroke="' + p.c + '" stroke-width="12" stroke-dasharray="' + Math.max(0, l - 2) + ' ' + (C - l + 2) + '" stroke-dashoffset="' + -off + '" transform="rotate(-90 50 50)"/>'; off += l; return s; }).join('');
-    return '<div class="dn"><svg width="120" height="120" viewBox="0 0 100 100" style="flex:none"><circle cx="50" cy="50" r="38" fill="none" stroke="rgba(255,255,255,.08)" stroke-width="12"/>' + segs + '<text x="50" y="55" text-anchor="middle" font-size="15" font-weight="600" fill="#fff">' + esc(center) + '</text></svg><div class="lg">' +
+    return '<div class="dn"><svg width="120" height="120" viewBox="0 0 100 100" style="flex:none"><circle cx="50" cy="50" r="38" fill="none" stroke="rgba(60,40,44,.08)" stroke-width="12"/>' + segs + '<text x="50" y="55" text-anchor="middle" font-size="15" font-weight="600" fill="#fff">' + esc(center) + '</text></svg><div class="lg">' +
       parts.map(function (p) { return '<div><i style="background:' + p.c + '"></i><span>' + esc(p.l) + '</span><b>' + n(p.v) + '</b></div>'; }).join('') + '</div></div>';
   }
   function area(vals, labs, c) {
@@ -183,7 +183,7 @@
     var X = function (i) { return p + i * (W - 2 * p) / (m - 1); }, Y = function (v) { return H - p - (v - lo) / sp * (H - 2 * p - 26); };
     var d = 'M' + X(0) + ' ' + Y(vals[0]); for (var i = 1; i < m; i++) { var mx = (X(i - 1) + X(i)) / 2; d += ' C' + mx + ' ' + Y(vals[i - 1]) + ' ' + mx + ' ' + Y(vals[i]) + ' ' + X(i) + ' ' + Y(vals[i]); }
     var k = vals.indexOf(hi), bx = Math.min(W - 30, Math.max(30, X(k)));
-    return '<svg class="ar" viewBox="0 0 ' + W + ' ' + H + '"><defs><linearGradient id="' + id + '" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="' + c + '" stop-opacity=".45"/><stop offset="1" stop-color="' + c + '" stop-opacity="0"/></linearGradient></defs><path d="' + d + ' L' + X(m - 1) + ' ' + H + ' L' + X(0) + ' ' + H + 'Z" fill="url(#' + id + ')"/><path d="' + d + '" fill="none" stroke="' + c + '" stroke-width="2.500" stroke-linecap="round"/><line x1="' + X(k) + '" x2="' + X(k) + '" y1="22" y2="' + H + '" stroke="rgba(255,255,255,.2)" stroke-dasharray="3 4"/><circle cx="' + X(k) + '" cy="' + Y(hi) + '" r="5" fill="#fff" stroke="' + c + '" stroke-width="3"/><rect x="' + (bx - 28) + '" y="0" width="56" height="20" rx="8" fill="#16211B"/><text x="' + bx + '" y="14" text-anchor="middle" font-size="11" font-weight="700" fill="#fff">' + n(hi, 1) + '</text></svg><div class="xl"><span>' + esc(labs[0]) + '</span><span>' + esc(labs[m - 1]) + '</span></div>';
+    return '<svg class="ar" viewBox="0 0 ' + W + ' ' + H + '"><defs><linearGradient id="' + id + '" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="' + c + '" stop-opacity=".45"/><stop offset="1" stop-color="' + c + '" stop-opacity="0"/></linearGradient></defs><path d="' + d + ' L' + X(m - 1) + ' ' + H + ' L' + X(0) + ' ' + H + 'Z" fill="url(#' + id + ')"/><path d="' + d + '" fill="none" stroke="' + c + '" stroke-width="2.500" stroke-linecap="round"/><line x1="' + X(k) + '" x2="' + X(k) + '" y1="22" y2="' + H + '" stroke="rgba(60,40,44,.16)" stroke-dasharray="3 4"/><circle cx="' + X(k) + '" cy="' + Y(hi) + '" r="5" fill="#fff" stroke="' + c + '" stroke-width="3"/><rect x="' + (bx - 28) + '" y="0" width="56" height="20" rx="8" fill="#2B2325"/><text x="' + bx + '" y="14" text-anchor="middle" font-size="11" font-weight="700" fill="#fff">' + n(hi, 1) + '</text></svg><div class="xl"><span>' + esc(labs[0]) + '</span><span>' + esc(labs[m - 1]) + '</span></div>';
   }
   function vbars(items) {   // items: [label, nilai]
     var mx = Math.max.apply(0, items.map(function (x) { return x[1]; })) || 1, top = items.reduce(function (a, x, i) { return x[1] > items[a][1] ? i : a; }, 0);
@@ -198,7 +198,7 @@
   function rows(k) { return S.an && Array.isArray(S.an[k]) ? S.an[k] : []; }
   function lvl(t) { return /krit|high|tinggi/i.test(t) ? 'bad' : /peringat|warn|sedang/i.test(t) ? 'warn' : 'good'; }
   function alertDonut() {
-    var a = rows('peringatan'), L = { bad: ['Kritis', '#D14343'], warn: ['Peringatan', '#E8C04A'], good: ['Info', '#9CC94B'] };
+    var a = rows('peringatan'), L = { bad: ['Kritis', '#C0392B'], warn: ['Peringatan', '#C9A24A'], good: ['Info', '#8DAA6E'] };
     return '<div class="card"><h4>Peringatan berdasarkan tingkat</h4>' + (a.length ? donut(['bad', 'warn', 'good'].map(function (k) { return { l: L[k][0], c: L[k][1], v: a.filter(function (r) { return lvl(r.tingkat) === k; }).length }; }), a.length) : '<span class="sm">Tidak ada peringatan.</span>') + '</div>';
   }
   function uq(r, k) { var o = []; r.forEach(function (x) { var v = String(x[k]); if (o.indexOf(v) < 0) o.push(v); }); return o; }
@@ -277,13 +277,13 @@
       dy = pick(fz(d, [/ketahanan|stock_?days|days_?cover|cover.*days|hari_?stok|stok_?hari/], /sku|kritis|idle|critical/), k.dy), cr = pick(fz(d, [/kritis|critical/], /pct/), k.cr), id = pick(fz(d, [/idle/], /pct/), k.id),
       cv = fz(d, [/(forecast|akurasi).*(sku|cover|tercakup)/, /sku.*(cover|tercakup|forecast)/], /pct/), nSku = T ? T.items.length : Number(d.total_sku);
     var cards = [
-      kpCard('#1FB6A6', 'Total Stok Hari Ini', n(tot), 'unit pack/sct/tin', dlt(d, 'stock|stok')),
-      kpCard('#2FBF8A', 'Delivery Hari Ini', n(dv), 'kirim terjadwal hari ini', dlt(d, 'deliver|kirim')),
-      kpCard('#FF5C6C', 'Forecast Accuracy', isFinite(Number(d.forecast_accuracy_pct)) ? pct(d.forecast_accuracy_pct) : '-', isFinite(cv) && isFinite(nSku) ? n(cv) + ' dari ' + n(nSku) + ' SKU tercakup' : '', dlt(d, 'forecast|akurasi')),
-      kpCard('#4F7BFF', 'Stok Available', n(av), 'setelah komitmen kirim', dlt(d, 'available|tersedia')),
-      kpCard('#9A86FF', 'Total Planning Produksi', n(pl), 'kebutuhan produksi', dlt(d, 'planning')),
-      kpCard('#FFB020', 'Total Pallet', isFinite(pa) ? n(pa) + '<em> pallet</em>' : '-', isFinite(nopa) && nopa > 0 ? n(nopa) + ' SKU belum ada data qty/pallet' : '', dlt(d, 'pallet')),
-      kpCard('#1FB6A6', 'Hari Ketahanan Stok', isFinite(dy) ? n(dy, 1) + '<em> hari</em>' : '-', (isFinite(cr) ? n(cr) + ' Kritis' : '') + (isFinite(cr) && isFinite(id) ? ' · ' : '') + (isFinite(id) ? n(id) + ' SKU idle' : ''), dlt(d, 'ketahanan|days|hari'), 'wide')
+      kpCard('#6BA38C', 'Total Stok Hari Ini', n(tot), 'unit pack/sct/tin', dlt(d, 'stock|stok')),
+      kpCard('#5E9C7C', 'Delivery Hari Ini', n(dv), 'kirim terjadwal hari ini', dlt(d, 'deliver|kirim')),
+      kpCard('#C0504D', 'Forecast Accuracy', isFinite(Number(d.forecast_accuracy_pct)) ? pct(d.forecast_accuracy_pct) : '-', isFinite(cv) && isFinite(nSku) ? n(cv) + ' dari ' + n(nSku) + ' SKU tercakup' : '', dlt(d, 'forecast|akurasi')),
+      kpCard('#7D8FA9', 'Stok Available', n(av), 'setelah komitmen kirim', dlt(d, 'available|tersedia')),
+      kpCard('#9488A8', 'Total Planning Produksi', n(pl), 'kebutuhan produksi', dlt(d, 'planning')),
+      kpCard('#B5474B', 'Total Pallet', isFinite(pa) ? n(pa) + '<em> pallet</em>' : '-', isFinite(nopa) && nopa > 0 ? n(nopa) + ' SKU belum ada data qty/pallet' : '', dlt(d, 'pallet')),
+      kpCard('#6BA38C', 'Hari Ketahanan Stok', isFinite(dy) ? n(dy, 1) + '<em> hari</em>' : '-', (isFinite(cr) ? n(cr) + ' Kritis' : '') + (isFinite(cr) && isFinite(id) ? ' · ' : '') + (isFinite(id) ? n(id) + ' SKU idle' : ''), dlt(d, 'ketahanan|days|hari'), 'wide')
     ];
     return '<div class="kps">' + cards.join('') + '</div>' + srcNote(T);
   }
@@ -298,7 +298,7 @@
     var b3 = wait || (idl.length ? '<b class="g">' + n(idl.length) + ' item</b> tidak punya rencana delivery maupun planning — berpotensi slow-moving atau mendekati kedaluwarsa: ' + esc(nm(idl)) + '.' : 'Tidak ada SKU idle.');
     var b4 = isFinite(safe) && isFinite(ts) ? '<b class="b">' + n(safe) + ' dari ' + n(ts) + ' SKU' + (isFinite(hp) ? ' (' + n(hp, 1) + '%)' : '') + '</b> dalam kondisi Aman. <b class="b">' + n(ts - safe) + ' item</b> memerlukan perhatian (gabungan kekurangan, menipis, dan idle) — prioritaskan berdasarkan urgensi gap dan tanggal pengiriman.' : 'Data kesehatan stok belum tersedia.';
     var bl = function (c, t, h) { return '<div class="an" style="--ac:' + c + '"><b>' + t + '</b><p>' + h + '</p></div>'; };
-    return '<div class="card"><h4>Analisa System</h4>' + bl('#FF5C6C', 'Kapasitas gudang vs kebutuhan pallet', b1) + bl('#FFB020', 'Stok menipis (utilisasi &gt; 70%)', b2) + bl('#8E93B8', 'Stok idle / tanpa permintaan', b3) + bl('#4F7BFF', 'Kesehatan stok keseluruhan', b4) + '</div>';
+    return '<div class="card"><h4>Analisa System</h4>' + bl('#C0504D', 'Kapasitas gudang vs kebutuhan pallet', b1) + bl('#B5474B', 'Stok menipis (utilisasi &gt; 70%)', b2) + bl('#9A9094', 'Stok idle / tanpa permintaan', b3) + bl('#7D8FA9', 'Kesehatan stok keseluruhan', b4) + '</div>';
   }
   function kfmt(v) { var a = Math.abs(v); return a >= 1000 ? (Math.round(v / 100) / 10) + 'k' : String(Math.round(v)); }
   function regress(pts) {
@@ -325,14 +325,14 @@
     if (!g) return head4 + '<div class="sm">Data belum cukup untuk regresi.</div></div>';
     var W = 340, H = 250, L = 38, R = 10, T = 10, B = 34, xmx = Math.max.apply(0, P.map(function (p) { return p[0]; })) * 1.08 || 1, ymx = Math.max.apply(0, P.map(function (p) { return p[1]; })) * 1.12 || 1, ymn = Math.min(0, Math.min.apply(0, P.map(function (p) { return p[1]; })));
     var X = function (v) { return L + v / xmx * (W - L - R); }, Y = function (v) { return T + (1 - (v - ymn) / (ymx - ymn)) * (H - T - B); }, o = '', i, t;
-    for (i = 0; i <= 4; i++) { t = ymn + (ymx - ymn) * i / 4; o += '<line x1="' + L + '" x2="' + (W - R) + '" y1="' + Y(t) + '" y2="' + Y(t) + '" stroke="rgba(255,255,255,.09)"/><text x="' + (L - 5) + '" y="' + (Y(t) + 3) + '" text-anchor="end" font-size="9" fill="#9AA3D6">' + kfmt(t) + '</text>'; }
-    for (i = 0; i <= 4; i++) { t = xmx * i / 4; o += '<line y1="' + T + '" y2="' + (H - B) + '" x1="' + X(t) + '" x2="' + X(t) + '" stroke="rgba(255,255,255,.09)"/><text x="' + X(t) + '" y="' + (H - B + 13) + '" text-anchor="middle" font-size="9" fill="#9AA3D6">' + kfmt(t) + '</text>'; }
-    o += '<text x="' + (L + (W - L - R) / 2) + '" y="' + (H - 4) + '" text-anchor="middle" font-size="9.5" fill="#9AA3D6">Stok Hari Ini</text><text transform="translate(9 ' + (T + (H - T - B) / 2) + ') rotate(-90)" text-anchor="middle" font-size="9.5" fill="#9AA3D6">Total Kebutuhan</text>';
+    for (i = 0; i <= 4; i++) { t = ymn + (ymx - ymn) * i / 4; o += '<line x1="' + L + '" x2="' + (W - R) + '" y1="' + Y(t) + '" y2="' + Y(t) + '" stroke="rgba(60,40,44,.10)"/><text x="' + (L - 5) + '" y="' + (Y(t) + 3) + '" text-anchor="end" font-size="9" fill="#8A8185">' + kfmt(t) + '</text>'; }
+    for (i = 0; i <= 4; i++) { t = xmx * i / 4; o += '<line y1="' + T + '" y2="' + (H - B) + '" x1="' + X(t) + '" x2="' + X(t) + '" stroke="rgba(60,40,44,.10)"/><text x="' + X(t) + '" y="' + (H - B + 13) + '" text-anchor="middle" font-size="9" fill="#8A8185">' + kfmt(t) + '</text>'; }
+    o += '<text x="' + (L + (W - L - R) / 2) + '" y="' + (H - 4) + '" text-anchor="middle" font-size="9.5" fill="#8A8185">Stok Hari Ini</text><text transform="translate(9 ' + (T + (H - T - B) / 2) + ') rotate(-90)" text-anchor="middle" font-size="9.5" fill="#8A8185">Total Kebutuhan</text>';
     var pts = '', out = 0;
-    P.forEach(function (p, j) { var x = X(p[0]), y = Y(p[1]); if (g.res[j] < -g.sd) { out++; pts += '<rect x="' + (x - 3.6) + '" y="' + (y - 3.6) + '" width="7.2" height="7.2" fill="#FFA11E"><title>' + esc(p[2]) + '</title></rect>'; } else pts += '<circle cx="' + x + '" cy="' + y + '" r="3.6" fill="#4F7BFF" fill-opacity=".9"><title>' + esc(p[2]) + '</title></circle>'; });
+    P.forEach(function (p, j) { var x = X(p[0]), y = Y(p[1]); if (g.res[j] < -g.sd) { out++; pts += '<rect x="' + (x - 3.6) + '" y="' + (y - 3.6) + '" width="7.2" height="7.2" fill="#B5474B"><title>' + esc(p[2]) + '</title></rect>'; } else pts += '<circle cx="' + x + '" cy="' + y + '" r="3.6" fill="#7D8FA9" fill-opacity=".9"><title>' + esc(p[2]) + '</title></circle>'; });
     var x1 = Math.min.apply(0, P.map(function (p) { return p[0]; })), x2 = Math.max.apply(0, P.map(function (p) { return p[0]; }));
-    o += '<line x1="' + X(x1) + '" y1="' + Y(g.a + g.b * x1) + '" x2="' + X(x2) + '" y2="' + Y(g.a + g.b * x2) + '" stroke="#FF5C6C" stroke-width="2" stroke-dasharray="6 4"/>' + pts;
-    return head4 + '<div class="lgd"><span><i style="background:#4F7BFF;border-radius:50%"></i>SKU (normal)</span><span><i style="background:#FFA11E"></i>SKU outlier (slow-moving)</span><span><i style="background:none;border-top:2px dashed #FF5C6C;height:0;width:16px"></i>Tren regresi linear</span></div><svg class="ar" viewBox="0 0 ' + W + ' ' + H + '">' + o + '</svg><div class="rg2"><span class="bad">▬ Tren regresi linear · R² = ' + g.r2.toFixed(3).replace('.', ',') + '</span><span class="sm">' + n(P.length) + ' SKU · ' + n(out) + ' outlier</span></div><div class="sm" style="margin-top:6px">Persamaan: y = ' + n(g.b, 3) + 'x ' + (g.a < 0 ? '− ' : '+ ') + n(Math.abs(g.a), 0) + '</div></div>';
+    o += '<line x1="' + X(x1) + '" y1="' + Y(g.a + g.b * x1) + '" x2="' + X(x2) + '" y2="' + Y(g.a + g.b * x2) + '" stroke="#C0504D" stroke-width="2" stroke-dasharray="6 4"/>' + pts;
+    return head4 + '<div class="lgd"><span><i style="background:#7D8FA9;border-radius:50%"></i>SKU (normal)</span><span><i style="background:#B5474B"></i>SKU outlier (slow-moving)</span><span><i style="background:none;border-top:2px dashed #C0504D;height:0;width:16px"></i>Tren regresi linear</span></div><svg class="ar" viewBox="0 0 ' + W + ' ' + H + '">' + o + '</svg><div class="rg2"><span class="bad">▬ Tren regresi linear · R² = ' + g.r2.toFixed(3).replace('.', ',') + '</span><span class="sm">' + n(P.length) + ' SKU · ' + n(out) + ' outlier</span></div><div class="sm" style="margin-top:6px">Persamaan: y = ' + n(g.b, 3) + 'x ' + (g.a < 0 ? '− ' : '+ ') + n(Math.abs(g.a), 0) + '</div></div>';
   }
 
 
@@ -374,12 +374,12 @@
     var rows = S.fef, note = fefNote(); if (!rows || !rows.length) return note;
     var K = fefKpi(rows), pc = function (a) { return K.q ? a / K.q * 100 : NaN; }, sla = 100 - pc(K.ex), g = function (c, v) { return '<span style="color:' + c + '">' + v + '</span>'; },
       cards = [
-        kpCard('#1FB6A6', 'Total kuantitas terkirim', n(K.q) + '<em> ctn</em>', ''),
-        kpCard('#4F7BFF', 'Rata-rata freshness SLED saat kirim', n(pc(K.g120), 1) + '<em>%</em>', 'sisa umur simpan ≥ 120 hari'),
-        kpCard('#2FBF8A', 'SLA (Service Level Agreement)', g('#4FD6A0', n(sla, 1) + '<em>%</em>'), n(K.ex) + ' ctn terkirim kedaluwarsa dari ' + n(K.q) + ' ctn total'),
-        kpCard('#9A86FF', 'Warehouse Throughput', n(K.q / K.days) + '<em> ctn/hari</em>', n(K.b / K.days) + ' baris pengiriman/hari · ' + n(K.b) + ' baris total'),
-        kpCard('#FF5C6C', 'Dead Stock / Near-Expired Risk', g('#FF6B8A', n(pc(K.l30), 1) + '<em>%</em>'), n(K.l30) + ' ctn (Expired + Critical &lt;30 hari)'),
-        kpCard('#FFB020', 'Batch Traceability Rate', n(pc(K.bt), 1) + '<em>%</em>', n(pc(K.bt), 0) + '% qty tercatat kode_batch')
+        kpCard('#6BA38C', 'Total kuantitas terkirim', n(K.q) + '<em> ctn</em>', ''),
+        kpCard('#7D8FA9', 'Rata-rata freshness SLED saat kirim', n(pc(K.g120), 1) + '<em>%</em>', 'sisa umur simpan ≥ 120 hari'),
+        kpCard('#5E9C7C', 'SLA (Service Level Agreement)', g('#5E9C7C', n(sla, 1) + '<em>%</em>'), n(K.ex) + ' ctn terkirim kedaluwarsa dari ' + n(K.q) + ' ctn total'),
+        kpCard('#9488A8', 'Warehouse Throughput', n(K.q / K.days) + '<em> ctn/hari</em>', n(K.b / K.days) + ' baris pengiriman/hari · ' + n(K.b) + ' baris total'),
+        kpCard('#C0504D', 'Dead Stock / Near-Expired Risk', g('#C0504D', n(pc(K.l30), 1) + '<em>%</em>'), n(K.l30) + ' ctn (Expired + Critical &lt;30 hari)'),
+        kpCard('#B5474B', 'Batch Traceability Rate', n(pc(K.bt), 1) + '<em>%</em>', n(pc(K.bt), 0) + '% qty tercatat kode_batch')
       ];
     var sel = S.fsel = S.fsel || { b: 'all', i: 'all' }, mons = [], skus = {};
     rows.forEach(function (r) { if (mons.indexOf(r.bulan) < 0) mons.push(r.bulan); skus[r.kode_sku] = r.nama_produk || ''; });
@@ -400,12 +400,12 @@
       xs = P.map(function (p) { return p[0]; }), ys = P.map(function (p) { return p[1]; }), xa = Math.min.apply(0, xs), xb = Math.max.apply(0, xs), ya = Math.min.apply(0, ys), yb = Math.max.apply(0, ys);
     var px = (xb - xa || 1) * 0.06, py = (yb - ya || 1) * 0.1; xa -= px; xb += px; ya -= py; yb += py;
     var X = function (v) { return L + (v - xa) / (xb - xa) * (W - L - R); }, Y = function (v) { return T + (1 - (v - ya) / (yb - ya)) * (H - T - B); }, o = '', i, t;
-    for (i = 0; i <= 4; i++) { t = ya + (yb - ya) * i / 4; o += '<line x1="' + L + '" x2="' + (W - R) + '" y1="' + Y(t) + '" y2="' + Y(t) + '" stroke="rgba(255,255,255,.09)"/><text x="' + (L - 6) + '" y="' + (Y(t) + 3) + '" text-anchor="end" font-size="9" fill="#9AA3D6">' + dayLbl(t) + '</text>'; }
-    for (i = 0; i <= 3; i++) { t = xa + (xb - xa) * i / 3; o += '<line y1="' + T + '" y2="' + (H - B) + '" x1="' + X(t) + '" x2="' + X(t) + '" stroke="rgba(255,255,255,.09)"/><text x="' + X(t) + '" y="' + (H - B + 13) + '" text-anchor="middle" font-size="9" fill="#9AA3D6">' + dayLbl(t) + '</text>'; }
-    o += '<text x="' + (L + (W - L - R) / 2) + '" y="' + (H - 4) + '" text-anchor="middle" font-size="9.5" fill="#9AA3D6">Bulan posting</text><text transform="translate(10 ' + (T + (H - T - B) / 2) + ') rotate(-90)" text-anchor="middle" font-size="9.5" fill="#9AA3D6">Rata² bulan kedaluwarsa (SLED)</text>';
-    if (fit) { var d = '', x; for (i = 0; i <= 60; i++) { x = Math.min(xs[0], xs[0]) + (xs[xs.length - 1] - xs[0]) * i / 60; d += (i ? 'L' : 'M') + X(x).toFixed(1) + ' ' + Y(fit.f(x)).toFixed(1); } o += '<path d="' + d + '" fill="none" stroke="#FF5C6C" stroke-width="2" stroke-dasharray="6 4"/>'; }
-    P.forEach(function (p) { o += '<circle cx="' + X(p[0]) + '" cy="' + Y(p[1]) + '" r="4.6" fill="#4F9BFF"><title>' + esc(sel.b === 'all' ? monLbl(p[2]) : p[2]) + ' · ' + n(p[3]) + ' ctn · expired rata-rata ' + dayLbl(p[1]) + '</title></circle>'; });
-    h += '<div class="lgd"><span><i style="background:#4F9BFF;border-radius:50%"></i>Posting vs Expired (aktual)</span><span><i style="background:none;border-top:2px dashed #FF5C6C;height:0;width:16px"></i>Tren regresi (derajat 2)</span></div><svg class="ar" viewBox="0 0 ' + W + ' ' + H + '">' + o + '</svg>' +
+    for (i = 0; i <= 4; i++) { t = ya + (yb - ya) * i / 4; o += '<line x1="' + L + '" x2="' + (W - R) + '" y1="' + Y(t) + '" y2="' + Y(t) + '" stroke="rgba(60,40,44,.10)"/><text x="' + (L - 6) + '" y="' + (Y(t) + 3) + '" text-anchor="end" font-size="9" fill="#8A8185">' + dayLbl(t) + '</text>'; }
+    for (i = 0; i <= 3; i++) { t = xa + (xb - xa) * i / 3; o += '<line y1="' + T + '" y2="' + (H - B) + '" x1="' + X(t) + '" x2="' + X(t) + '" stroke="rgba(60,40,44,.10)"/><text x="' + X(t) + '" y="' + (H - B + 13) + '" text-anchor="middle" font-size="9" fill="#8A8185">' + dayLbl(t) + '</text>'; }
+    o += '<text x="' + (L + (W - L - R) / 2) + '" y="' + (H - 4) + '" text-anchor="middle" font-size="9.5" fill="#8A8185">Bulan posting</text><text transform="translate(10 ' + (T + (H - T - B) / 2) + ') rotate(-90)" text-anchor="middle" font-size="9.5" fill="#8A8185">Rata² bulan kedaluwarsa (SLED)</text>';
+    if (fit) { var d = '', x; for (i = 0; i <= 60; i++) { x = Math.min(xs[0], xs[0]) + (xs[xs.length - 1] - xs[0]) * i / 60; d += (i ? 'L' : 'M') + X(x).toFixed(1) + ' ' + Y(fit.f(x)).toFixed(1); } o += '<path d="' + d + '" fill="none" stroke="#C0504D" stroke-width="2" stroke-dasharray="6 4"/>'; }
+    P.forEach(function (p) { o += '<circle cx="' + X(p[0]) + '" cy="' + Y(p[1]) + '" r="4.6" fill="#7D8FA9"><title>' + esc(sel.b === 'all' ? monLbl(p[2]) : p[2]) + ' · ' + n(p[3]) + ' ctn · expired rata-rata ' + dayLbl(p[1]) + '</title></circle>'; });
+    h += '<div class="lgd"><span><i style="background:#7D8FA9;border-radius:50%"></i>Posting vs Expired (aktual)</span><span><i style="background:none;border-top:2px dashed #C0504D;height:0;width:16px"></i>Tren regresi (derajat 2)</span></div><svg class="ar" viewBox="0 0 ' + W + ' ' + H + '">' + o + '</svg>' +
       '<div class="rg2"><span class="bad">▬ Tren regresi polinomial (derajat 2)' + (fit ? ' · R² = ' + fit.r2.toFixed(3).replace('.', ',') : ' · butuh minimal 4 titik') + '</span></div>' +
       '<div class="sm" style="margin-top:6px">Rata-rata bulan kedaluwarsa (SLED) terhadap bulan posting, dengan tren regresi. ' + (sel.b === 'all' ? 'Satu titik = satu bulan posting.' : 'Satu titik = satu SKU pada bulan terpilih.') + '</div></div>';
     return '<div class="kps">' + cards.join('') + '</div>' + note + h;
@@ -537,11 +537,11 @@
   function legend(segs, avg) { return '<div class="lgd">' + segs.map(function (sg) { return '<span><i style="background:' + sg.c + '"></i>' + esc(sg.l) + '</span>'; }).join('') + '<span><i style="background:none;border-top:2px dashed #fff;height:0;width:16px"></i>Rata-rata beban kerja (' + n(avg, 1) + ')</span></div>'; }
   function topBlock(title, ico, R) {
     var arr = R.list.slice().sort(function (a, b) { return b.t - a.t || (a.nama < b.nama ? -1 : 1); }), top = arr.slice(0, 3), low = arr.slice().sort(function (a, b) { return a.t - b.t || (a.nama < b.nama ? -1 : 1); }).slice(0, 3);
-    var med = ['#FFB020', '#C5CAE0', '#C98A52'];
+    var med = ['#B5474B', '#8A8185', '#B98A5E'];
     return '<div class="card"><h4>' + ico + ' ' + esc(title) + '</h4><div class="trh2">🏆 Top 3 Achievement</div>' + top.map(function (o, i) {
       var d = o.t - R.avg, p = R.avg ? d / R.avg * 100 : 0;
-      return '<div class="tp"><span class="rk" style="background:' + med[i] + ';color:#1B1305">' + (i + 1) + '</span><div><b>' + esc(o.nama) + '</b><small class="up">' + (d >= 0 ? '+' : '') + n(d, 1) + ' tugas dari rata-rata peran (' + (p >= 0 ? '+' : '') + n(p, 0) + '%)</small></div><span class="tv">' + n(o.t) + ' tugas</span></div>';
-    }).join('') + '<div class="trh2" style="color:#FF6B8A">▼ 3 Terendah</div>' + low.map(function (o, i) {
+      return '<div class="tp"><span class="rk" style="background:' + med[i] + ';color:#2B2325">' + (i + 1) + '</span><div><b>' + esc(o.nama) + '</b><small class="up">' + (d >= 0 ? '+' : '') + n(d, 1) + ' tugas dari rata-rata peran (' + (p >= 0 ? '+' : '') + n(p, 0) + '%)</small></div><span class="tv">' + n(o.t) + ' tugas</span></div>';
+    }).join('') + '<div class="trh2" style="color:#C0504D">▼ 3 Terendah</div>' + low.map(function (o, i) {
       return '<div class="tp low"><span class="rk">' + (i + 1) + '</span><div><b>' + esc(o.nama) + '</b></div><span class="tv">' + n(o.t) + ' tugas</span></div>';
     }).join('') + '</div>';
   }
@@ -549,23 +549,23 @@
     var L = S.log, note = logNote(); if (!L || !L.dim.length) return note;
     var A = logAgg(L), pct = function (v) { return A.n ? v / A.n * 100 : NaN; }, sla = pct(A.c + A.sd), topShare = A.top ? nv(A.top.trips) / A.n * 100 : NaN, g = function (c, v) { return '<span style="color:' + c + '">' + v + '</span>';  };
     var cards = [
-      kpCard('#FFB020', 'Total Pengiriman', n(A.n) + '<em> unit</em>', n(A.hari) + ' hari pemantauan'),
-      kpCard('#FFB020', 'Rata-rata Durasi Loading', fDur(A.avg), 'in → out, seluruh pengiriman'),
-      kpCard('#FFB020', 'Ekspedisi Aktif', n(A.eksp) + '<em> perusahaan</em>', 'mitra ekspedisi berbeda'),
-      kpCard('#FF5C6C', 'SLA Loading', g(sla >= 80 ? '#4FD6A0' : '#FF6B8A', n(sla, 0) + '<em>%</em>'), n(A.c + A.sd) + ' dari ' + n(A.n) + ' pengiriman ≤90 mnt'),
-      kpCard('#FFB020', 'Konsentrasi Ekspedisi', n(topShare, 0) + '<em>%</em>', A.top ? esc(A.top.kunci) + ' — ' + n(A.top.trips) + ' dari ' + n(A.n) + ' pengiriman' : ''),
-      kpCard('#FFB020', 'Utilisasi Kendaraan', n(A.n / A.kend, 1) + '<em> trip/unit</em>', n(A.kend) + ' kendaraan unik menangani ' + n(A.n) + ' pengiriman')
+      kpCard('#B5474B', 'Total Pengiriman', n(A.n) + '<em> unit</em>', n(A.hari) + ' hari pemantauan'),
+      kpCard('#B5474B', 'Rata-rata Durasi Loading', fDur(A.avg), 'in → out, seluruh pengiriman'),
+      kpCard('#B5474B', 'Ekspedisi Aktif', n(A.eksp) + '<em> perusahaan</em>', 'mitra ekspedisi berbeda'),
+      kpCard('#C0504D', 'SLA Loading', g(sla >= 80 ? '#5E9C7C' : '#C0504D', n(sla, 0) + '<em>%</em>'), n(A.c + A.sd) + ' dari ' + n(A.n) + ' pengiriman ≤90 mnt'),
+      kpCard('#B5474B', 'Konsentrasi Ekspedisi', n(topShare, 0) + '<em>%</em>', A.top ? esc(A.top.kunci) + ' — ' + n(A.top.trips) + ' dari ' + n(A.n) + ' pengiriman' : ''),
+      kpCard('#B5474B', 'Utilisasi Kendaraan', n(A.n / A.kend, 1) + '<em> trip/unit</em>', n(A.kend) + ' kendaraan unik menangani ' + n(A.n) + ' pengiriman')
     ];
-    var seg3 = [['Cepat', A.c, '#34C9AE', '≤60 mnt'], ['Sedang', A.sd, '#FFB020', '61–90 mnt'], ['Lambat', A.l, '#FF5F5C', '>90 mnt (lewat SLA)']];
+    var seg3 = [['Cepat', A.c, '#5E9C7C', '≤60 mnt'], ['Sedang', A.sd, '#B5474B', '61–90 mnt'], ['Lambat', A.l, '#C0504D', '>90 mnt (lewat SLA)']];
     var ring = '<div class="card"><h4>Ringkasan Durasi Loading</h4><div class="sm" style="margin:-6px 0 12px">Sekilas pandang sebelum masuk ke detail per pengiriman.</div><div class="ms3"><div><small>Rata-rata durasi</small><b>' + fDur(A.avg, 1) + '</b></div><div><small>Tercepat</small><b>' + fDur(A.mn, 1) + '</b></div><div><small>Terlama</small><b>' + fDur(A.mx, 1) + '</b></div></div>' +
       '<div class="sm" style="margin:12px 0 8px">Dari ' + n(A.n) + ' pengiriman, dikelompokkan berdasarkan kecepatan loading (target SLA: 90 mnt)</div><div class="sbar">' + seg3.map(function (x) { return x[1] ? '<span style="flex:' + x[1] + ';background:' + x[2] + '">' + n(pct(x[1]), 0) + '%</span>' : ''; }).join('') + '</div>' +
       '<div class="lgd" style="margin-top:10px">' + seg3.map(function (x) { return '<span><i style="background:' + x[2] + '"></i>' + x[0] + ' · ' + n(x[1]) + ' pengiriman · ' + x[3] + '</span>'; }).join('') + '</div></div>';
     var P = roleTbl(L, 'picker'), M = roleTbl(L, 'muat'), F = roleTbl(L, 'stuffing');
     var pr = P.list.map(function (o) { return { nama: o.nama, t: o.t, seg: { BWB: o.ar.BWB, C20: o.ar.C20, C40: o.ar.C40, LAIN: o.ar.LAIN } }; }).sort(function (a, b) { return b.t - a.t; }).slice(0, 10), pAvg = pr.length ? sum(pr, function (o) { return o.t; }) / pr.length : 0;
-    var S1 = [{ k: 'BWB', l: 'BWB', c: '#34C9AE' }, { k: 'C20', l: 'C20', c: '#FFB020' }, { k: 'C40', l: 'C40', c: '#FF5F5C' }, { k: 'LAIN', l: 'Lainnya', c: '#8E93B8' }];
+    var S1 = [{ k: 'BWB', l: 'BWB', c: '#5E9C7C' }, { k: 'C20', l: 'C20', c: '#B5474B' }, { k: 'C40', l: 'C40', c: '#C0504D' }, { k: 'LAIN', l: 'Lainnya', c: '#9A9094' }];
     var mm = {}; M.list.forEach(function (o) { mm[o.nama] = mm[o.nama] || { nama: o.nama, m: 0, f: 0 }; mm[o.nama].m += o.t; }); F.list.forEach(function (o) { mm[o.nama] = mm[o.nama] || { nama: o.nama, m: 0, f: 0 }; mm[o.nama].f += o.t; });
     var mac = Object.keys(mm).map(function (k) { var o = mm[k]; return { nama: o.nama, t: o.m + o.f, seg: { M: o.m, F: o.f } }; }).sort(function (a, b) { return b.t - a.t; }).slice(0, 10), mAvg = mac.length ? sum(mac, function (o) { return o.t; }) / mac.length : 0;
-    var S2 = [{ k: 'M', l: 'Muat', c: '#FFB020' }, { k: 'F', l: 'Stuffing', c: '#34C9AE' }];
+    var S2 = [{ k: 'M', l: 'Muat', c: '#B5474B' }, { k: 'F', l: 'Stuffing', c: '#5E9C7C' }];
     var yam = '<div class="card"><h4>Yamazumi Chart — Beban Kerja Picker</h4><div class="sm" style="margin:-6px 0 12px">Tugas per picker distack per jenis armada, garis putus-putus = rata-rata beban kerja (10 teratas).</div>' + (pr.length ? '<div class="wl">' + stackRows(pr, S1, Math.max.apply(0, pr.map(function (o) { return o.t; })) * 1.05, pAvg) + '</div>' + legend(S1, pAvg) : '<div class="sm">Belum ada data picker.</div>') + '</div>';
     var macc = '<div class="card"><h4>Multiple Activity Chart — Tim Muat &amp; Stuffing</h4><div class="sm" style="margin:-6px 0 12px">Breakdown aktivitas Muat vs Stuffing per personel, garis putus-putus = rata-rata beban kerja (10 teratas).</div>' + (mac.length ? '<div class="wl">' + stackRows(mac, S2, Math.max.apply(0, mac.map(function (o) { return o.t; })) * 1.05, mAvg) + '</div>' + legend(S2, mAvg) : '<div class="sm">Belum ada data muat/stuffing.</div>') + '</div>';
     return '<div class="kps">' + cards.join('') + '</div>' + note + ring + yam + macc + topBlock('PICKER', '🏷️', P) + topBlock('TIM MUAT', '📦', M) + topBlock('TIM STUFFING', '🚛', F) +
@@ -592,7 +592,7 @@
 
 
   // ---------- Analisa Biaya tenaga kerja per karton (mengikuti dashboard desktop) ----------
-  var BST = { Efisien: '#34C9AE', Efektif: '#6FA8FF', Boros: '#FF6B8A' };
+  var BST = { Efisien: '#5E9C7C', Efektif: '#7D8FA9', Boros: '#C0504D' };
   // Data cost labour manual per bulan (dipakai bila view belum memuat nilainya).
   var BMAN = { '2026-09': { cost_labour: 225839895, total_labour: 45 } };
   function bFill(x) {
@@ -620,7 +620,7 @@
   function biayaView(r) {
     var rs = bHas(r), ok = rs.filter(bOk); if (!ok.length) return '<div class="note">Belum ada bulan dengan data cost labour.</div>';
     var cur = bPick(rs, 'now'), hi = bPick(rs, 'hi'), lo = bPick(rs, 'lo'), avg = sum(ok, function (x) { return Number(x.biaya_per_carton); }) / ok.length, tg = Number(cur.target_rp);
-    var st = function (x) { return '<span style="color:' + (BST[x.status_efisiensi] || '#9AA3D6') + '">' + esc(x.status_efisiensi || '') + '</span>'; };
+    var st = function (x) { return '<span style="color:' + (BST[x.status_efisiensi] || '#8A8185') + '">' + esc(x.status_efisiensi || '') + '</span>'; };
     // insight untuk manajemen (dihitung dari data bulan terbaru yang terisi)
     var prv = ok.length > 1 ? ok[ok.length - 2] : null, dl = Number(cur.total_delivery), cl = Number(cur.cost_labour), hc = Number(cur.total_labour), bc = Number(cur.biaya_per_carton), up = 1.1, bcUp = cl / (dl * up);
     var li = [];
@@ -631,25 +631,25 @@
     }
     var intro = '<div class="card"><h4>Cara membaca angka ini untuk manajemen (analisis)</h4><ul class="ins">' + li.join('') + '</ul><div class="sm" style="margin-top:8px">Status: Efisien jika biaya ≤ 90% target · Efektif ±10% target · Boros jika &gt; 110% target.</div></div>';
     var cards = '<div class="kps">' +
-      kpCard(BST[cur.status_efisiensi] || '#FFB020', bMid(cur.bulan), 'Rp ' + n(cur.biaya_per_carton, 0), st(cur) + ' · target ' + idr(cur.target_rp), NaN, '', 'b_now') +
-      kpCard('#4F7BFF', 'Rata-rata', 'Rp ' + n(avg, 0), n(ok.length) + ' bulan dengan data cost labour', NaN, '', 'b_avg') +
-      kpCard('#FF5C6C', 'Tertinggi', 'Rp ' + n(hi.biaya_per_carton, 0), bMid(hi.bulan) + ' · ' + st(hi), NaN, '', 'b_hi') +
-      kpCard('#2FBF8A', 'Terendah', 'Rp ' + n(lo.biaya_per_carton, 0), bMid(lo.bulan) + ' · ' + st(lo), NaN, '', 'b_lo') + '</div>';
+      kpCard(BST[cur.status_efisiensi] || '#B5474B', bMid(cur.bulan), 'Rp ' + n(cur.biaya_per_carton, 0), st(cur) + ' · target ' + idr(cur.target_rp), NaN, '', 'b_now') +
+      kpCard('#7D8FA9', 'Rata-rata', 'Rp ' + n(avg, 0), n(ok.length) + ' bulan dengan data cost labour', NaN, '', 'b_avg') +
+      kpCard('#C0504D', 'Tertinggi', 'Rp ' + n(hi.biaya_per_carton, 0), bMid(hi.bulan) + ' · ' + st(hi), NaN, '', 'b_hi') +
+      kpCard('#5E9C7C', 'Terendah', 'Rp ' + n(lo.biaya_per_carton, 0), bMid(lo.bulan) + ' · ' + st(lo), NaN, '', 'b_lo') + '</div>';
     // grafik batang
     var W = 340, H = 232, T = 26, B = 50, pad = 6, m = rs.length, sl = (W - pad * 2) / m, bw = Math.min(30, sl * 0.62), mx = Math.max.apply(0, ok.map(function (x) { return Number(x.biaya_per_carton); }).concat([tg || 0])) * 1.12, base = H - B;
     var Y = function (v) { return base - v / mx * (base - T); }, o = '';
-    if (tg) o += '<line x1="' + pad + '" x2="' + (W - pad) + '" y1="' + Y(tg) + '" y2="' + Y(tg) + '" stroke="rgba(255,255,255,.45)" stroke-dasharray="4 4"/>';
-    o += '<line x1="' + pad + '" x2="' + (W - pad) + '" y1="' + base + '" y2="' + base + '" stroke="rgba(255,255,255,.15)"/>';
+    if (tg) o += '<line x1="' + pad + '" x2="' + (W - pad) + '" y1="' + Y(tg) + '" y2="' + Y(tg) + '" stroke="rgba(60,40,44,.5)" stroke-dasharray="4 4"/>';
+    o += '<line x1="' + pad + '" x2="' + (W - pad) + '" y1="' + base + '" y2="' + base + '" stroke="rgba(60,40,44,.14)"/>';
     rs.forEach(function (x, i) {
-      var cx = pad + sl * i + sl / 2, has = bOk(x), c = BST[x.status_efisiensi] || '#6FA8FF', v = has ? Number(x.biaya_per_carton) : 0, y = Y(v);
+      var cx = pad + sl * i + sl / 2, has = bOk(x), c = BST[x.status_efisiensi] || '#7D8FA9', v = has ? Number(x.biaya_per_carton) : 0, y = Y(v);
       o += '<g data-m="b_m:' + esc(String(x.bulan).slice(0, 10)) + '" role="button" tabindex="0" aria-label="' + esc(bLong(x.bulan)) + ': ' + (has ? 'Rp ' + n(v, 0) + ' ' + esc(x.status_efisiensi || '') : 'belum ada data') + '" style="cursor:pointer">' +
-        (has ? '<rect x="' + (cx - bw / 2) + '" y="' + y + '" width="' + bw + '" height="' + (base - y) + '" rx="4" fill="' + c + '" fill-opacity=".92"/><text x="' + cx + '" y="' + (y - 5) + '" text-anchor="middle" font-size="9.5" font-weight="700" fill="#fff">' + n(v, 0) + '</text>' : '<text x="' + cx + '" y="' + (base - 6) + '" text-anchor="middle" font-size="12" fill="#9AA3D6">—</text>') +
-        '<text x="' + cx + '" y="' + (base + 14) + '" text-anchor="middle" font-size="9" fill="#C9CFF0">' + esc(bShort(x.bulan).replace(' ', ' ')) + '</text><text x="' + cx + '" y="' + (base + 27) + '" text-anchor="middle" font-size="8" font-weight="700" fill="' + (has ? c : '#6B74A8') + '">' + (has ? esc(x.status_efisiensi || '') : '') + '</text><rect x="' + (cx - sl / 2) + '" y="0" width="' + sl + '" height="' + H + '" fill="transparent"/></g>';
+        (has ? '<rect x="' + (cx - bw / 2) + '" y="' + y + '" width="' + bw + '" height="' + (base - y) + '" rx="4" fill="' + c + '" fill-opacity=".92"/><text x="' + cx + '" y="' + (y - 5) + '" text-anchor="middle" font-size="9.5" font-weight="700" fill="#fff">' + n(v, 0) + '</text>' : '<text x="' + cx + '" y="' + (base - 6) + '" text-anchor="middle" font-size="12" fill="#8A8185">—</text>') +
+        '<text x="' + cx + '" y="' + (base + 14) + '" text-anchor="middle" font-size="9" fill="#5F575B">' + esc(bShort(x.bulan).replace(' ', ' ')) + '</text><text x="' + cx + '" y="' + (base + 27) + '" text-anchor="middle" font-size="8" font-weight="700" fill="' + (has ? c : '#8A8185') + '">' + (has ? esc(x.status_efisiensi || '') : '') + '</text><rect x="' + (cx - sl / 2) + '" y="0" width="' + sl + '" height="' + H + '" fill="transparent"/></g>';
     });
     var chart = '<div class="card"><h4>Biaya per karton per bulan (Rp)</h4><svg class="ar" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Grafik biaya per karton per bulan">' + o + '</svg><div class="sm clg"><span>Ketuk batang atau baris bulan untuk melihat detail.</span>' + (tg ? '<span class="tgl"><i></i>Target Rp ' + n(tg, 0) + '</span>' : '') + '</div></div>';
     // tabel detail per bulan (format sama dengan dashboard desktop)
     var trs = rs.map(function (x) {
-      var has = bOk(x), c = BST[x.status_efisiensi] || '#9AA3D6', p = Number(x.pct_dari_target), key = esc(String(x.bulan).slice(0, 10));
+      var has = bOk(x), c = BST[x.status_efisiensi] || '#8A8185', p = Number(x.pct_dari_target), key = esc(String(x.bulan).slice(0, 10));
       var st = has ? '<span class=\"bs\" style=\"color:' + c + ';background:' + c + '22\">' + esc(x.status_efisiensi || '') + '</span>' : '<span class=\"bs bs0\">—</span>';
       return '<tr role=\"button\" tabindex=\"0\" data-m=\"b_m:' + key + '\" aria-label=\"Detail ' + esc(bLong(x.bulan)) + '\">' +
         '<td class=\"bt-m\">' + esc(bMid(x.bulan)) + '</td>' +
@@ -672,7 +672,7 @@
     }
     var x = key === 'b_now' ? bPick(rs, 'now') : key === 'b_hi' ? bPick(rs, 'hi') : key === 'b_lo' ? bPick(rs, 'lo') : rs.filter(function (z) { return String(z.bulan).slice(0, 10) === key.slice(4); })[0];
     if (!x) return null;
-    var has = bOk(x), c = BST[x.status_efisiensi] || '#9AA3D6', tg = Number(x.target_rp), v = Number(x.biaya_per_carton), sel = has && isFinite(tg) ? v - tg : NaN;
+    var has = bOk(x), c = BST[x.status_efisiensi] || '#8A8185', tg = Number(x.target_rp), v = Number(x.biaya_per_carton), sel = has && isFinite(tg) ? v - tg : NaN;
     var kv = [['Total kirim (karton)', n(x.total_delivery)], ['Cost labour', has ? 'Rp ' + n(x.cost_labour) : '—'], ['Rata² karyawan / bulan', has ? n(x.total_labour) : '—'], ['Biaya / karton', has ? 'Rp ' + n(v, 2) : '—'], ['Target', 'Rp ' + n(tg, 0)], ['% target', has ? n(x.pct_dari_target, 1) + '%' : '—'], ['Selisih dari target', isFinite(sel) ? (sel > 0 ? '+' : '−') + 'Rp ' + n(Math.abs(sel), 0) + ' / karton' : '—'], ['Status', has ? '<span style="color:' + c + ';font-weight:700">' + esc(x.status_efisiensi || '') + '</span>' : 'Belum diisi']];
     return { title: 'Biaya tenaga kerja — ' + bLong(x.bulan), sub: has ? 'Cost labour ÷ total karton terkirim' : 'Cost labour belum diinput untuk bulan ini', kv: kv, meter: has ? { p: Number(x.pct_dari_target), c: c } : null,
       note: has ? 'Biaya/karton = Rp ' + n(x.cost_labour) + ' ÷ ' + n(x.total_delivery) + ' karton. Efisien ≤ 90% target · Efektif 90–110% · Boros &gt; 110%.' : 'Total kirim ikut data terbaru; cost labour dan rata-rata karyawan diinput manual per bulan.' };
@@ -733,7 +733,7 @@
     var el = $('map'); if (!el || !window.L || !S.pts) return;
     var m = L.map(el); L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18, attribution: '&copy; OpenStreetMap' }).addTo(m);
     var mx = Math.max.apply(0, S.pts.map(function (x) { return N(x.total_qty); })) || 1, b = [];
-    S.pts.forEach(function (x) { var p = [N(x.lat), N(x.lng)]; b.push(p); L.circleMarker(p, { radius: 6 + Math.sqrt(N(x.total_qty) / mx) * 16, color: '#14201A', weight: 1, fillColor: '#9CC94B', fillOpacity: .65 }).addTo(m).bindPopup('<b>' + esc(x.label) + '</b><br>' + n(x.total_qty) + ' qty · ' + n(x.jml_pelanggan) + ' pelanggan'); });
+    S.pts.forEach(function (x) { var p = [N(x.lat), N(x.lng)]; b.push(p); L.circleMarker(p, { radius: 6 + Math.sqrt(N(x.total_qty) / mx) * 16, color: '#FFFFFF', weight: 1, fillColor: '#8DAA6E', fillOpacity: .65 }).addTo(m).bindPopup('<b>' + esc(x.label) + '</b><br>' + n(x.total_qty) + ' qty · ' + n(x.jml_pelanggan) + ' pelanggan'); });
     m.fitBounds(b, { padding: [20, 20], maxZoom: 9 });
   }
   function an() {
@@ -748,7 +748,7 @@
     var k = S.sub, r = rows(k === 'peta' ? petaKey() : k), q, g, L; if (k === 'peta') return h + (r.length ? petaView(r) : secState('peta')); if (!r.length) return h + secState(k);
     if (k === 'armada') { q = pick('per', uq(r, 'periode')); var ra = r.filter(function (x) { return String(x.periode) === q[0]; }); return h + q[1] + tls([['Total karton', n(sum(ra, function (x) { return x.total_karton; }))], ['Total m³', n(sum(ra, function (x) { return x.total_m3; }))], ['Total ton', n(sum(ra, function (x) { return x.total_ton; }), 1)], ['Jumlah gudang', n(uq(ra, 'whs').length)]]) + armadaCharts(q[0]); }
     if (k === 'peringatan') return h + alertDonut() + '<div class="card"><h4>Teratas</h4>' + r.slice(0, 5).map(al).join('') + '</div>';
-    if (k === 'prioritas') return h + tls([['SKU prioritas', n(r.length)], ['Dampak m³', n(sum(r, function (x) { return x.dampak_m3; }))]]) + dn(r, function (x) { return x.aksi || '-'; }, 'Berdasarkan aksi') + rank(r.map(function (x) { return [x.produk || x.kode_sku, N(x.hari_cukup_prediksi)]; }), function (v) { return n(v, 1) + ' hr'; }, '#D14343', 'Stok paling cepat habis', 1);
+    if (k === 'prioritas') return h + tls([['SKU prioritas', n(r.length)], ['Dampak m³', n(sum(r, function (x) { return x.dampak_m3; }))]]) + dn(r, function (x) { return x.aksi || '-'; }, 'Berdasarkan aksi') + rank(r.map(function (x) { return [x.produk || x.kode_sku, N(x.hari_cukup_prediksi)]; }), function (v) { return n(v, 1) + ' hr'; }, '#C0392B', 'Stok paling cepat habis', 1);
     if (k === 'tren' || k === 'shipments_ringkas') {
       q = byDim(r, k); var y = k === 'tren' ? [['qty_per_hari', 'Qty per hari'], ['m3_per_hari', 'm³ per hari']] : [['qty', 'Qty per bulan'], ['m3', 'm³ per bulan']]; g = ser(q[0], 'bulan', y[0][0]);
       if (g.length) { var pv = g.length > 1 ? g[g.length - 2][1] : 0; return h + q[1] + tls([['Bulan terakhir', mon(last(g)[0])], [y[0][1], n(last(g)[1])], ['Pertumbuhan MoM', pv ? pct((last(g)[1] - pv) / pv * 100) : null]]) + lines(q[0], 'bulan', y, mon); }
@@ -759,8 +759,8 @@
     if (k === 'biaya_carton' && r[0].bulan) return h + biayaView(r);
     if (k === 'estimasi_budget') { L = r[0]; var it = [['Proyeksi terendah', N(L.proyeksi_biaya_rp_terendah)], ['Proyeksi', N(L.proyeksi_biaya_rp)], ['Proyeksi tertinggi', N(L.proyeksi_biaya_rp_tertinggi)], ['Budget ideal', N(L.budget_ideal_rp)]].filter(function (x) { return isFinite(x[1]); }), mx = Math.max.apply(0, it.map(function (x) { return x[1]; })) || 1; return h + tls([['Proyeksi qty 22 hari', n(L.proyeksi_qty_22hari)], ['Rata-rata biaya / carton', idr(L.rata2_biaya_per_carton)]]) + '<div class="card"><h4>Estimasi biaya bulan depan</h4>' + hbars(it.map(function (x) { return [x[0], 0, idr(x[1]), x[1] / mx * 100]; }), PAL[0]) + '</div>'; }
     if (k === 'kendaraan') { L = r[0]; return h + tls([['Kebutuhan kendaraan', n(L.kebutuhan_kendaraan)], ['Qty karton', n(L.qty_karton)], ['m³ rencana', n(L.m3_plan)], ['Rata-rata trip / hari', n(L.rata2_trip_per_hari, 1)]]) + '<div class="card"><h4>Dibutuhkan vs rata-rata historis</h4>' + hbars([['Dibutuhkan hari ini', 0, n(L.kebutuhan_kendaraan), N(L.kebutuhan_kendaraan) / (Math.max(N(L.kebutuhan_kendaraan), N(L.rata2_trip_per_hari)) || 1) * 100], ['Rata-rata trip / hari', 0, n(L.rata2_trip_per_hari, 1), N(L.rata2_trip_per_hari) / (Math.max(N(L.kebutuhan_kendaraan), N(L.rata2_trip_per_hari)) || 1) * 100]], PAL[1]) + '</div>'; }
-    if (k === 'prediksi') return h + tls([['SKU diprediksi', n(r.length)], ['Proyeksi qty 22 hari', n(sum(r, function (x) { return x.proyeksi_qty_22hari; }))]]) + dn(r, function (x) { return x.status_prediksi || '-'; }, 'Status prediksi') + rank(r.map(function (x) { return [x.produk, N(x.kekurangan_22hari)]; }).filter(function (x) { return x[1] > 0; }), function (v) { return n(v); }, '#D14343', 'Kekurangan stok 22 hari');
-    if (k === 'stok_vs_kirim') return h + tls([['SKU', n(r.length)], ['Stok tersedia', n(sum(r, function (x) { return x.stok_available; }))]]) + dn(r, function (x) { return x.status || '-'; }, 'Status stok') + rank(r.map(function (x) { return [x.produk, N(x.hari_cukup)]; }).filter(function (x) { return x[1] >= 0; }), function (v) { return n(v, 1) + ' hr'; }, '#D14343', 'Stok paling cepat habis', 1);
+    if (k === 'prediksi') return h + tls([['SKU diprediksi', n(r.length)], ['Proyeksi qty 22 hari', n(sum(r, function (x) { return x.proyeksi_qty_22hari; }))]]) + dn(r, function (x) { return x.status_prediksi || '-'; }, 'Status prediksi') + rank(r.map(function (x) { return [x.produk, N(x.kekurangan_22hari)]; }).filter(function (x) { return x[1] > 0; }), function (v) { return n(v); }, '#C0392B', 'Kekurangan stok 22 hari');
+    if (k === 'stok_vs_kirim') return h + tls([['SKU', n(r.length)], ['Stok tersedia', n(sum(r, function (x) { return x.stok_available; }))]]) + dn(r, function (x) { return x.status || '-'; }, 'Status stok') + rank(r.map(function (x) { return [x.produk, N(x.hari_cukup)]; }).filter(function (x) { return x[1] >= 0; }), function (v) { return n(v, 1) + ' hr'; }, '#C0392B', 'Stok paling cepat habis', 1);
     if (k === 'sku_belum_master') return h + tls([['SKU bermasalah', n(r.length)]]) + dn(r, function (x) { return x.masalah || x.sumber || '-'; }, 'Jenis masalah');
     return h + auto(r);
   }

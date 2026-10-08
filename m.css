@@ -269,3 +269,56 @@ svg.ar g:focus-visible{outline:2px solid #FFA11E}
 
 .clg{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
 .tgl{display:inline-flex;align-items:center;gap:6px;white-space:nowrap;color:#C9CFF0;font-weight:600}.tgl i{display:inline-block;width:16px;border-top:2px dashed rgba(255,255,255,.55)}
+
+/* ===== Tema lembut: terang, aksen merah redup (mengikuti referensi), tanpa gradien mencolok ===== */
+:root{--bg:#F6F4F3;--c:#fff;--ink:#2B2325;--m:#7B7378;--ln:#E9E3E2;--lime:#B5474B;--lime2:#B5474B;--dk:#2B2325;--good:#4C8F6B;--warn:#A9741E;--bad:#C0392B;--ac:#A94548;--ac2:#F3E3E2}
+html,body{background:var(--bg);background-image:none;color:var(--ink)}
+.rb,.card,.tl,.pgw,.chip,.dd{background-color:#fff;border:1px solid var(--ln);box-shadow:0 1px 2px rgba(60,30,34,.05)}
+.rb i{background:var(--ac)}
+.hero{background:var(--ac);color:#fff;border:0}
+.bar,.pgb,.mtb,.mbar{background:rgba(60,40,44,.08)}
+.pgb i{background:var(--ac)}
+.ico,.rk{background:rgba(60,40,44,.06)}
+.chart i,.vb i{background:rgba(60,40,44,.08)}
+.chart .hi i,.vb .hi i{background:var(--ac)}
+.chip.good{background:#E6F1EA;color:var(--good)}.chip.warn{background:#F7EBD3;color:var(--warn)}.chip.bad{background:#F8E1DE;color:var(--bad)}
+.tag{background:#E6F1EA;color:var(--good)}.tag.e{background:#F8E1DE;color:var(--bad)}
+.note{background:#F8E9E7;color:#8C3B38;border:1px solid #EBCFCB}
+.av{color:#fff;background:var(--ac)}
+.dd{color:var(--ink);color-scheme:light;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23A94548' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")}
+.dd option{background:#fff;color:var(--ink)}.dd:focus-visible{outline-color:var(--ac)}
+.tiles .tl{border:0;box-shadow:none}
+.tiles .tl:nth-child(3n+1){background:var(--ac);color:#fff}
+.tiles .tl:nth-child(3n+2){background:var(--ac2);color:var(--ink)}
+.tiles .tl:nth-child(3n){background:#ECE7E6;color:var(--ink)}
+.nav{background:#fff;box-shadow:0 6px 20px rgba(60,30,34,.12),0 0 0 1px var(--ln)}
+.nav .on{background:var(--ac2);color:var(--ac)}.nav .fab{background:var(--ac);color:#fff}
+.leaflet-container{background:#EDE9E8}
+.sum .vl{background:var(--ln)}.sum .s1 small{color:var(--ac)}.sum .s2 small{color:var(--m)}
+.zc{color:#fff;box-shadow:0 2px 8px rgba(60,30,34,.12)}.zc::before{background:rgba(255,255,255,.1)}
+.zc.b{background:#A94548}.zc.p{background:#B96B6E}.zc.o{background:#8C8286;color:#fff}.zc.v{background:#6F5E63}
+.zi{background:#fff;color:var(--ac);box-shadow:none}
+.za,.zc.p .za,.zc.o .za,.zc.v .za{background:#fff;color:var(--ac);box-shadow:none}
+.trh{color:var(--m)}.trh button{color:var(--ac)}
+.tk::after{border-left-color:#D9CFCE}
+.nd{background:var(--ac);color:#fff}.nd.warn{background:#B98A5E;color:#fff}.nd.bad{background:#C0504D}
+.dp{background:var(--ac);border:0;color:#fff}
+.pill{background:#C0504D;color:#fff}.pill.good{background:#5E9C7C}.pill.warn{background:#B98A5E;color:#fff}
+.fb{background:#fff;color:var(--ac);box-shadow:0 4px 12px rgba(60,30,34,.2)}
+.tri div:nth-child(1) small{color:var(--ac)}.tri div:nth-child(2) small{color:#8C8286}.tri div:nth-child(3) small{color:#7D8FA9}
+.tb{background:#fff}.tbh{color:var(--m)}
+.dl.up{background:#E6F1EA}.dl.dn{background:#F8E1DE}
+.an p{color:#5F575B}.an .r{color:#C0392B}.an .o{color:#A9741E}.an .g{color:#8A8185}.an .b{color:#5F7592}
+.kp.clk:focus-visible,.bm:focus-visible,.bt tbody tr:focus-visible{outline-color:var(--ac)}.kp.clk b::after{color:var(--ac)}
+.mbk{background:rgba(40,25,28,.4);backdrop-filter:none}
+.msh{background:#fff;box-shadow:0 -10px 30px rgba(60,30,34,.18)}
+.mtabs .on{background:var(--ac);color:#fff}
+.mr:first-child .rk{background:var(--ac);color:#fff}
+.mbar u{background:#9A8F94}.mbar.crit u{background:#C0504D}
+.ms3>div,.tp{background:#F6F4F3}
+.sbar{color:#fff}
+.wn,.tgl{color:#5F575B}.wb{background:#F0ECEB}.wt .avg{border-left-color:rgba(60,40,44,.6)}
+.trh2,.tp .up{color:var(--ac)}.tp.low .rk{background:#F8E1DE;color:#C0392B}
+.card code{background:#F0ECEB}
+.bs0{color:#8A8185;background:#F0ECEB}.tgl i{border-top-color:rgba(60,40,44,.5)}
+.mtb u{border-left-color:rgba(60,40,44,.6)}
