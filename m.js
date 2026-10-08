@@ -776,12 +776,11 @@
     var ks = Object.keys(r[0]).filter(function (c) { return r.some(function (x) { return x[c] != null && x[c] !== '' && typeof x[c] !== 'object'; }); });
     if (!ks.length) return '';
     var nc = {}; ks.forEach(function (c) { nc[c] = !CODE.test(c) && !/^\d{4}-\d\d-\d\d/.test(String(r[0][c])) && r.every(function (x) { return x[c] == null || x[c] === '' || isNumV(x[c]); }) && r.some(function (x) { return isNumV(x[c]); }); });
-    S.more = S.more || {}; var lim = 50 * (1 + (S.more[k] || 0)), shown = r.slice(0, lim);
+    var shown = r.slice(0, 10);
     var th = ks.map(function (c) { return '<th' + (nc[c] ? '' : ' class="l"') + '>' + esc(colLbl(c)) + '</th>'; }).join('');
     var tr = shown.map(function (x) { return '<tr>' + ks.map(function (c) { return '<td' + (nc[c] ? '' : ' class="l"') + '>' + cellV(c, x[c], nc[c]) + '</td>'; }).join('') + '</tr>'; }).join('');
-    return '<div class="card"><h4>Detail data <span class="sm" style="font-weight:400">· ' + n(r.length) + ' baris</span></h4><div class="btw"><table class="dt"><thead><tr>' + th + '</tr></thead><tbody>' + tr + '</tbody></table></div>' +
-      '<div class="sm">Geser ke samping untuk melihat semua kolom.' + (r.length > shown.length ? ' Menampilkan ' + n(shown.length) + ' dari ' + n(r.length) + ' baris.' : '') + '</div>' +
-      (r.length > shown.length ? '<button class="chip" style="margin-top:10px" data-a="more" data-k="' + esc(k) + '">Tampilkan 50 lagi</button>' : '') + '</div>';
+    return '<div class="card"><h4>Detail data <span class="sm" style="font-weight:400">· 10 data teratas' + (r.length > shown.length ? ' dari ' + n(r.length) + ' baris' : '') + '</span></h4><div class="btw"><table class="dt"><thead><tr>' + th + '</tr></thead><tbody>' + tr + '</tbody></table></div>' +
+      '<div class="sm">Geser ke samping untuk melihat semua kolom.</div></div>';
   }
   function detailSec() {
     var k = S.sub, r = rows(k === 'peta' ? petaKey() : k);
@@ -853,7 +852,6 @@
     else if (t.dataset.s) { S.sub = t.dataset.s; render(); ens(); }
     else if (t.dataset.a === 'reload') load();
     else if (t.dataset.a === 'retry') secLoad(S.sub, 1);
-    else if (t.dataset.a === 'more') { S.more = S.more || {}; S.more[t.dataset.k] = (S.more[t.dataset.k] || 0) + 1; render(); }
     else if (t.dataset.a === 'stk') stkLoad(1);
     else if (t.dataset.a === 'fef') fefLoad(1);
     else if (t.dataset.a === 'dim') dimLoad(1);
