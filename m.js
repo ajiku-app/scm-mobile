@@ -593,7 +593,21 @@
 
   // ---------- Analisa Biaya tenaga kerja per karton (mengikuti dashboard desktop) ----------
   var BST = { Efisien: '#34C9AE', Efektif: '#6FA8FF', Boros: '#FF6B8A' };
-  function bHas(r) { return r.slice().sort(function (a, b) { return a.bulan < b.bulan ? -1 : 1; }); }
+  // Data cost labour manual per bulan (dipakai bila view belum memuat nilainya).
+  var BMAN = { '2026-09': { cost_labour: 225839895, total_labour: 45 } };
+  function bFill(x) {
+    var m = BMAN[String(x.bulan).slice(0, 7)];
+    if (!m || (x.cost_labour != null && Number(x.cost_labour) > 0)) return x;
+    var y = {}, k; for (k in x) y[k] = x[k];
+    y.cost_labour = m.cost_labour; y.total_labour = m.total_labour;
+    var d = Number(y.total_delivery), tg = Number(y.target_rp);
+    if (d > 0) {
+      y.biaya_per_carton = m.cost_labour / d;
+      if (tg > 0) { y.pct_dari_target = y.biaya_per_carton / tg * 100; y.status_efisiensi = y.pct_dari_target <= 90 ? 'Efisien' : y.pct_dari_target > 110 ? 'Boros' : 'Efektif'; }
+    }
+    return y;
+  }
+  function bHas(r) { return r.map(bFill).sort(function (a, b) { return a.bulan < b.bulan ? -1 : 1; }); }
   function bOk(x) { return x.biaya_per_carton != null && isFinite(Number(x.biaya_per_carton)); }
   function bShort(iso) { try { return new Date(String(iso).slice(0, 10) + 'T00:00:00Z').toLocaleDateString('id-ID', { month: 'short', year: '2-digit', timeZone: 'UTC' }); } catch (e) { return String(iso).slice(0, 7); } }
   function bMid(iso) { try { return new Date(String(iso).slice(0, 10) + 'T00:00:00Z').toLocaleDateString('id-ID', { month: 'short', year: 'numeric', timeZone: 'UTC' }); } catch (e) { return String(iso).slice(0, 7); } }
@@ -625,14 +639,21 @@
         '<text x="' + cx + '" y="' + (base + 14) + '" text-anchor="middle" font-size="9" fill="#C9CFF0">' + esc(bShort(x.bulan).replace(' ', ' ')) + '</text><text x="' + cx + '" y="' + (base + 27) + '" text-anchor="middle" font-size="8" font-weight="700" fill="' + (has ? c : '#6B74A8') + '">' + (has ? esc(x.status_efisiensi || '') : '') + '</text><rect x="' + (cx - sl / 2) + '" y="0" width="' + sl + '" height="' + H + '" fill="transparent"/></g>';
     });
     var chart = '<div class="card"><h4>Biaya per karton per bulan (Rp)</h4><svg class="ar" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Grafik biaya per karton per bulan">' + o + '</svg><div class="sm">Ketuk batang atau baris bulan untuk melihat detail.</div></div>';
-    // daftar bulan (setara tabel desktop)
-    var list = '<div class="card"><h4>Detail per bulan</h4>' + rs.slice().reverse().map(function (x) {
-      var has = bOk(x), c = BST[x.status_efisiensi] || '#6B74A8', p = Number(x.pct_dari_target);
-      return '<div class="bm" role="button" tabindex="0" data-m="b_m:' + esc(String(x.bulan).slice(0, 10)) + '" aria-label="Detail ' + esc(bLong(x.bulan)) + '"><div class="bh"><b>' + esc(bLong(x.bulan)) + '</b>' + (has ? '<span class="bs" style="color:' + c + ';background:' + c + '22">' + esc(x.status_efisiensi || '') + '</span>' : '<span class="bs" style="color:#9AA3D6;background:rgba(255,255,255,.08)">Belum diisi</span>') + '</div>' +
-        '<div class="bv"><span>' + (has ? 'Rp ' + n(x.biaya_per_carton, 0) + '<small> / karton</small>' : '—') + '</span><span class="bp">' + (isFinite(p) && has ? n(p, 1) + '% target' : '') + '</span></div>' +
-        (has ? '<span class="mbar"><u style="width:' + Math.max(3, Math.min(100, p / 160 * 100)).toFixed(1) + '%;background:' + c + '"></u></span>' : '') +
-        '<div class="sm">Kirim ' + n(x.total_delivery) + ' karton' + (has ? ' · Cost ' + idr(x.cost_labour) + ' · ' + n(x.total_labour) + ' karyawan' : '') + '</div></div>';
-    }).join('') + '</div>';
+    // tabel detail per bulan (format sama dengan dashboard desktop)
+    var trs = rs.map(function (x) {
+      var has = bOk(x), c = BST[x.status_efisiensi] || '#9AA3D6', p = Number(x.pct_dari_target), key = esc(String(x.bulan).slice(0, 10));
+      var st = has ? '<span class=\"bs\" style=\"color:' + c + ';background:' + c + '22\">' + esc(x.status_efisiensi || '') + '</span>' : '<span class=\"bs bs0\">—</span>';
+      return '<tr role=\"button\" tabindex=\"0\" data-m=\"b_m:' + key + '\" aria-label=\"Detail ' + esc(bLong(x.bulan)) + '\">' +
+        '<td class=\"bt-m\">' + esc(bMid(x.bulan)) + '</td>' +
+        '<td>' + n(x.total_delivery) + '</td>' +
+        '<td>' + (has ? 'Rp ' + n(x.cost_labour) : '—') + '</td>' +
+        '<td>' + (has ? n(x.total_labour) : '—') + '</td>' +
+        '<td>' + (has ? 'Rp ' + n(x.biaya_per_carton, 0) : '—') + '</td>' +
+        '<td>Rp ' + n(x.target_rp, 0) + '</td>' +
+        '<td>' + (has && isFinite(p) ? n(p, 1) + '%' : '—') + '</td>' +
+        '<td>' + st + '</td></tr>';
+    }).join('');
+    var list = '<div class=\"card\"><h4>Detail per bulan</h4><div class=\"btw\"><table class=\"bt\"><thead><tr><th>Bulan</th><th>Total kirim (karton)</th><th>Cost labour</th><th>Rata² karyawan/bulan</th><th>Biaya/karton</th><th>Target</th><th>% target</th><th>Status</th></tr></thead><tbody>' + trs + '</tbody></table></div><div class=\"sm\">Geser ke samping untuk melihat semua kolom. Ketuk baris untuk detail bulan.</div></div>';
     return intro + cards + chart + list;
   }
   function bizSpec(key) {

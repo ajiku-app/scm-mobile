@@ -253,3 +253,14 @@ body{background:radial-gradient(520px 360px at 85% -60px,rgba(46,60,230,.35),tra
 .mtr{margin:2px 0 14px}.mtb{position:relative;height:10px;border-radius:6px;background:rgba(255,255,255,.08)}.mtb i{position:absolute;left:0;top:0;bottom:0;border-radius:6px}.mtb u{position:absolute;top:-3px;bottom:-3px;border-left:2px solid rgba(255,255,255,.55);text-decoration:none}
 .mtl{display:flex;justify-content:space-between;font-size:10.5px;color:var(--m);margin-top:6px}
 svg.ar g:focus-visible{outline:2px solid #FFA11E}
+
+/* tabel biaya tenaga kerja per bulan */
+.btw{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:0 -4px 8px;padding:0 4px}
+.bt{width:100%;min-width:640px;border-collapse:collapse;font-size:12px;font-variant-numeric:tabular-nums}
+.bt th{text-align:right;font-weight:500;color:var(--m);padding:8px 10px;white-space:nowrap;border-bottom:1px solid var(--ln)}
+.bt td{text-align:right;padding:11px 10px;white-space:nowrap;border-top:1px solid var(--ln)}
+.bt th:first-child,.bt td:first-child{text-align:left;position:sticky;left:0;background:var(--c);z-index:1}
+.bt th:last-child,.bt td:last-child{text-align:left}
+.bt tbody tr{cursor:pointer}.bt tbody tr:focus-visible{outline:2px solid #FFA11E;outline-offset:-2px}
+.bt-m{font-weight:700}
+.bs0{color:#9AA3D6;background:rgba(255,255,255,.08)}
