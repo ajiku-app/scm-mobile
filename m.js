@@ -5,6 +5,7 @@
   var P = {
     box: '<path d="M21 8l-9-5-9 5v8l9 5 9-5zM3 8l9 5 9-5M12 13v8"/>', truck: '<path d="M2 6h11v10H2zM13 10h4l3 3v3h-7zM6 19a2 2 0 1 0 0 .1M17 19a2 2 0 1 0 0 .1"/>',
     clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>', users: '<circle cx="9" cy="8" r="3"/><path d="M3 20c0-3.5 3-6 6-6s6 2.500 6 6M16 5a3 3 0 0 1 0 6M21 20c0-2.500-1.500-4.500-4-5.500"/>',
+    trend: '<path d="M3 17l6-6 4 4 8-8M15 7h6v6"/>',
     home: '<path d="M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/>', chart: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
     user: '<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.500-6 8-6s8 2 8 6"/>', back: '<path d="M15 5l-7 7 7 7"/>', ref: '<path d="M21 12a9 9 0 1 1-3-6.700M21 4v5h-5"/>',
     bell: '<path d="M6 9a6 6 0 0 1 12 0c0 6 2 7 2 7H4s2-1 2-7M10 20a2 2 0 0 0 4 0"/>', warn: '<path d="M12 3l10 18H2zM12 10v5M12 18v.1"/>', chev: '<path d="M9 5l7 7-7 7"/>'
@@ -104,7 +105,7 @@
     } catch (e) { tend(k, 0); S.anSec[k] = 'err:' + e.message; }
     render();
   }
-  async function homeAn() { await Promise.all([secLoad('armada', 1), secLoad('peringatan', 1), secLoad('tren', 1), secLoad('prediksi', 1)]); }
+  async function homeAn() { await Promise.all([secLoad('armada', 1), secLoad('peringatan', 1)]); }
   async function stkLoad(force) {
     if (S.stkSt === 'load' || (!force && S.stk)) return;
     S.stkSt = 'load'; render();
@@ -112,7 +113,7 @@
     try { S.stk = await get('/api/stok' + (/^\w+$/.test(tn) ? '?t=' + tn : ''), 58000); S.stkSt = ''; } catch (e) { S.stk = null; S.stkSt = 'err:' + e.message; }
     render();
   }
-  function ens() { if (S.v === 'an' && S.sub && !S.fresh[S.sub]) secLoad(S.sub); else if (S.v === 'z:logistics') { if (!S.log && S.logSt !== 'load') logLoad(); } else if (S.v === 'z:fefo') { if (!S.fef && S.fefSt !== 'load') fefLoad(); } else if (S.v === 'z:stock') { if (!S.stk && S.stkSt !== 'load') stkLoad(); if (!S.fresh.stok_vs_kirim) secLoad('stok_vs_kirim'); } }
+  function ens() { if (S.v === 'fc') { if (!S.fresh.tren) secLoad('tren'); if (!S.fresh.prediksi) secLoad('prediksi'); } else if (S.v === 'an' && S.sub && !S.fresh[S.sub]) secLoad(S.sub); else if (S.v === 'z:logistics') { if (!S.log && S.logSt !== 'load') logLoad(); } else if (S.v === 'z:fefo') { if (!S.fef && S.fefSt !== 'load') fefLoad(); } else if (S.v === 'z:stock') { if (!S.stk && S.stkSt !== 'load') stkLoad(); if (!S.fresh.stok_vs_kirim) secLoad('stok_vs_kirim'); } }
   function secState(k) {
     var s = S.anSec[k] || '';
     if (s === 'load') return pgHtml([k], 'Memuat ' + k.replace(/_/g, ' '));
@@ -125,7 +126,7 @@
       await window.SCM_AUTH_READY;
       var s = await window.scmSupabase.auth.getSession();
       S.email = (s.data.session && s.data.session.user.email) || '';
-      await Promise.all(Object.keys(Z).map(function (k) { return zoneLoad(k, 1); }).concat(homeAn(), S.v === 'an' && S.sub !== 'armada' && S.sub !== 'peringatan' ? secLoad(S.sub, 1) : [], S.v === 'z:stock' ? [secLoad('stok_vs_kirim', 1), stkLoad(1)] : [], S.v === 'z:fefo' ? [fefLoad(1)] : [], S.v === 'z:logistics' ? [logLoad(1)] : []));
+      await Promise.all(Object.keys(Z).map(function (k) { return zoneLoad(k, 1); }).concat(homeAn(), S.v === 'an' && S.sub !== 'armada' && S.sub !== 'peringatan' ? secLoad(S.sub, 1) : [], S.v === 'fc' ? [secLoad('tren', 1), secLoad('prediksi', 1)] : [], S.v === 'z:stock' ? [secLoad('stok_vs_kirim', 1), stkLoad(1)] : [], S.v === 'z:fefo' ? [fefLoad(1)] : [], S.v === 'z:logistics' ? [logLoad(1)] : []));
       S.ok = Object.keys(Z).some(zone); S.stale = 0; S.at = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }); save();
     } catch (e) { S.ok = false; S.anErr = e.message; }
     S.busy = 0; S.last = Date.now(); render();
@@ -237,7 +238,7 @@
       '<div class="sum"><div class="s1"><small>Skor operasional</small><b>' + (isFinite(sc) ? Math.round(sc) + '%' : '-') + '</b></div><i class="vl"></i><button class="s2" data-v="an" data-s="peringatan"><small>Peringatan</small><b>' + n(ac) + '</b></button></div>' + errNote() +
       Object.keys(Z).map(zc).join('') +
       '<div class="tiles">' + PICK.map(function (p) { var d = zone(p[0]), x = Z[p[0]].k[p[1]], v = d && x[1](d); return d && v != null && isFinite(Number(v)) ? tile(x[0], x[2](v, d)) : ''; }).join('') + '</div>' +
-      armadaCharts() + homeSec('tren', 'Tren', function (r) { return trendBody(r, 'tren') || '<div class="card sm">Belum ada data tren.</div>'; }) + homeSec('prediksi', 'Prediksi', prediksiBody) + alertDonut() + '<div class="trh"><span>Peringatan:</span><button data-v="an" data-s="peringatan">Lihat semua</button></div>' +
+      armadaCharts() + alertDonut() + '<div class="trh"><span>Peringatan:</span><button data-v="an" data-s="peringatan">Lihat semua</button></div>' +
       '<div class="track">' + (al4.length ? al4.map(al).join('') : '<span class="sm">Tidak ada peringatan.</span>') + '</div>';
   }
 
@@ -773,13 +774,18 @@
     if (k === 'sku_belum_master') return h + tls([['SKU bermasalah', n(r.length)]]) + dn(r, function (x) { return x.masalah || x.sumber || '-'; }, 'Jenis masalah');
     return h + auto(r);
   }
+  function forecast() {
+    var h = head('Forecast', 'Tren & prediksi', 1);
+    if (S.busy && !rows('tren').length && !rows('prediksi').length) return h + pgHtml(['tren', 'prediksi'], 'Memuat forecast');
+    return h + homeSec('tren', 'Tren', function (r) { return trendBody(r, 'tren') || '<div class="card sm">Belum ada data tren.</div>'; }) + homeSec('prediksi', 'Prediksi', prediksiBody);
+  }
   function me() {
     return head('Profil', 'Akun & pengaturan', 1) + '<div class="card"><div class="av">' + esc((S.email[0] || 'U').toUpperCase()) + '</div><div class="sm">Masuk sebagai</div><b>' + esc(S.email || '-') + '</b></div><div class="card pf"><button data-a="reload"><span>Muat ulang data</span>' + ic('chev') + '</button><a href="' + DESKTOP_URL + '"><span>Buka versi desktop</span>' + ic('chev') + '</a><button data-a="out" class="bad"><span>Keluar</span>' + ic('chev') + '</button></div>';
   }
   function render() {
-    $('main').innerHTML = S.v === 'home' ? home() : S.v === 'an' ? an() : S.v === 'me' ? me() : detail(S.v.slice(2));
+    $('main').innerHTML = S.v === 'home' ? home() : S.v === 'an' ? an() : S.v === 'fc' ? forecast() : S.v === 'me' ? me() : detail(S.v.slice(2));
     var on = function (v) { return S.v === v ? ' class="on"' : ''; };
-    var NAV = [['home', 'home', 'Dashboard'], ['an', 'chart', 'Analysis'], ['z:fefo', 'clock', 'Fefo'], ['z:stock', 'box', 'Monitoring'], ['z:logistics', 'truck', 'Logistik']];
+    var NAV = [['home', 'home', 'Dashboard'], ['an', 'chart', 'Analysis'], ['z:fefo', 'clock', 'Fefo'], ['z:stock', 'box', 'Monitoring'], ['z:logistics', 'truck', 'Logistik'], ['fc', 'trend', 'Forecast']];
     $('nav').innerHTML = NAV.map(function (x) { return '<button data-v="' + x[0] + '"' + on(x[0]) + ' aria-label="' + x[2] + '">' + ic(x[1]) + '<span>' + x[2] + '</span></button>'; }).join('');
     var c = document.querySelector('.seg .on'); if (c && c.scrollIntoView) c.scrollIntoView({ inline: 'center', block: 'nearest' });
     initMap();
