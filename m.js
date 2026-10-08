@@ -112,7 +112,7 @@
     try { S.stk = await get('/api/stok' + (/^\w+$/.test(tn) ? '?t=' + tn : ''), 58000); S.stkSt = ''; } catch (e) { S.stk = null; S.stkSt = 'err:' + e.message; }
     render();
   }
-  function ens() { if (S.v === 'an' && S.sub && !S.fresh[S.sub]) secLoad(S.sub); else if (S.v === 'z:fefo') { if (!S.fef && S.fefSt !== 'load') fefLoad(); } else if (S.v === 'z:stock') { if (!S.stk && S.stkSt !== 'load') stkLoad(); if (!S.fresh.stok_vs_kirim) secLoad('stok_vs_kirim'); } }
+  function ens() { if (S.v === 'an' && S.sub && !S.fresh[S.sub]) secLoad(S.sub); else if (S.v === 'z:logistics') { if (!S.log && S.logSt !== 'load') logLoad(); } else if (S.v === 'z:fefo') { if (!S.fef && S.fefSt !== 'load') fefLoad(); } else if (S.v === 'z:stock') { if (!S.stk && S.stkSt !== 'load') stkLoad(); if (!S.fresh.stok_vs_kirim) secLoad('stok_vs_kirim'); } }
   function secState(k) {
     var s = S.anSec[k] || '';
     if (s === 'load') return pgHtml([k], 'Memuat ' + k.replace(/_/g, ' '));
@@ -125,7 +125,7 @@
       await window.SCM_AUTH_READY;
       var s = await window.scmSupabase.auth.getSession();
       S.email = (s.data.session && s.data.session.user.email) || '';
-      await Promise.all(Object.keys(Z).map(function (k) { return zoneLoad(k, 1); }).concat(homeAn(), S.v === 'an' && S.sub !== 'armada' && S.sub !== 'peringatan' ? secLoad(S.sub, 1) : [], S.v === 'z:stock' ? [secLoad('stok_vs_kirim', 1), stkLoad(1)] : [], S.v === 'z:fefo' ? [fefLoad(1)] : []));
+      await Promise.all(Object.keys(Z).map(function (k) { return zoneLoad(k, 1); }).concat(homeAn(), S.v === 'an' && S.sub !== 'armada' && S.sub !== 'peringatan' ? secLoad(S.sub, 1) : [], S.v === 'z:stock' ? [secLoad('stok_vs_kirim', 1), stkLoad(1)] : [], S.v === 'z:fefo' ? [fefLoad(1)] : [], S.v === 'z:logistics' ? [logLoad(1)] : []));
       S.ok = Object.keys(Z).some(zone); S.stale = 0; S.at = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }); save();
     } catch (e) { S.ok = false; S.anErr = e.message; }
     S.busy = 0; S.last = Date.now(); render();
@@ -246,7 +246,8 @@
   }
   function dlt(d, kw) { return fz(d, [new RegExp('(delta|change|chg|perubahan|growth|vs_?kemarin|trend).*(' + kw + ')'), new RegExp('(' + kw + ').*(delta|change|chg|perubahan|growth|vs_?kemarin|trend)')]); }
   var MK = { 'Total Stok Hari Ini': 'k_tot', 'Delivery Hari Ini': 'k_dv', 'Stok Available': 'k_av', 'Total Planning Produksi': 'k_pl', 'Total Pallet': 'k_pa', 'Hari Ketahanan Stok': 'k_dy',
-    'Total kuantitas terkirim': 'f_total', 'Rata-rata freshness SLED saat kirim': 'f_fresh', 'SLA (Service Level Agreement)': 'f_sla', 'Warehouse Throughput': 'f_thr', 'Dead Stock / Near-Expired Risk': 'f_risk', 'Batch Traceability Rate': 'f_trace' };
+    'Total kuantitas terkirim': 'f_total', 'Rata-rata freshness SLED saat kirim': 'f_fresh', 'SLA (Service Level Agreement)': 'f_sla', 'Warehouse Throughput': 'f_thr', 'Dead Stock / Near-Expired Risk': 'f_risk', 'Batch Traceability Rate': 'f_trace',
+    'Total Pengiriman': 'l_total', 'Rata-rata Durasi Loading': 'l_dur', 'Ekspedisi Aktif': 'l_eksp', 'SLA Loading': 'l_sla', 'Konsentrasi Ekspedisi': 'l_konsen', 'Utilisasi Kendaraan': 'l_util' };
   function kpCard(c, label, val, sub, dl, extra) {
     var up = dl > 0, ch = isFinite(dl) ? '<span class="dl ' + (up ? 'up' : 'dn') + '">' + (up ? '▲' : '▼') + ' ' + n(Math.abs(dl), 1) + '%</span>' : '', mk = MK[label];
     return '<div class="kp ' + (extra || '') + (mk ? ' clk' : '') + '" style="--kc:' + c + '"' + (mk ? ' role="button" tabindex="0" data-m="' + mk + '" aria-label="' + esc(label) + ' — lihat 10 data teratas"' : '') + '><div class="kh"><small>' + esc(label) + '</small>' + ch + '</div><b>' + val + '</b>' + (sub ? '<span>' + sub + '</span>' : '') + '</div>';
@@ -465,10 +466,10 @@
   }
   function mdlSpec() {
     var k = S.mdl && S.mdl.k; if (!k) return null;
-    var sp = k.charAt(0) === 'f' ? fefSpec(k) : stkSpec(k); return sp;
+    var sp = k.charAt(0) === 'f' ? fefSpec(k) : k.charAt(0) === 'l' ? logSpec(k) : stkSpec(k); return sp;
   }
   function mdlHtml(sp) {
-    var head = '<div class="mhd"><div><h3 id="mdlT">' + esc(sp.title || (S.mdl.k.charAt(0) === 'f' ? 'Detail FEFO' : 'Detail stok')) + '</h3><small>' + (sp.sub || 'Top 10 data teratas') + '</small></div><button class="mcl" data-mx="1" aria-label="Tutup">×</button></div>';
+    var head = '<div class="mhd"><div><h3 id="mdlT">' + esc(sp.title || (S.mdl.k.charAt(0) === 'f' ? 'Detail FEFO' : S.mdl.k.charAt(0) === 'l' ? 'Detail logistik' : 'Detail stok')) + '</h3><small>' + (sp.sub || 'Top 10 data teratas') + '</small></div><button class="mcl" data-mx="1" aria-label="Tutup">×</button></div>';
     if (!sp.tabs) {
       var body = sp.err ? '<div class="note" style="margin:0"><b>Data belum bisa dibaca.</b><div style="margin:4px 0 8px">' + esc(sp.err) + '</div><button class="chip" data-a="' + sp.retry + '">Coba lagi</button></div>' : '<div class="sm" style="padding:18px 0">Memuat data…</div>';
       return head + '<div class="mbd">' + body + '</div>';
@@ -489,7 +490,100 @@
   }
   function openM(key) {
     S.mdl = { k: key, t: '' }; mdlSync();
-    if (key.charAt(0) === 'f') dimLoad(); else if (!S.stk && S.stkSt !== 'load') stkLoad();
+    if (key.charAt(0) === 'f') dimLoad(); else if (key.charAt(0) === 'l') { if (!S.log && S.logSt !== 'load') logLoad(); } else if (!S.stk && S.stkSt !== 'load') stkLoad();
+  }
+
+
+  // ---------- Monitoring Logistik ----------
+  async function logLoad(force) {
+    if (S.logSt === 'load' || (!force && S.log)) return;
+    S.logSt = 'load'; render();
+    try { var j = await get('/api/logistics', 58000); S.log = { dim: j.dim || [], peran: j.peran || [] }; S.logSt = ''; } catch (e) { S.log = null; S.logSt = 'err:' + e.message; }
+    render(); mdlSync();
+  }
+  function fDur(m, long) {
+    m = Math.round(Number(m)); if (!isFinite(m)) return '-';
+    var h = Math.floor(m / 60), r = m % 60;
+    return long ? (h ? h + ' jam ' : '') + r + ' mnt' : (h ? h + 'j ' : '') + r + 'm';
+  }
+  function logNote() {
+    if (S.logSt === 'load') return '<div class="sm src">Memuat data logistik…</div>';
+    if (S.logSt && S.logSt.indexOf('err:') === 0) return '<div class="note" style="margin:0 0 12px"><b>Data logistik belum bisa dibaca.</b><div style="margin:4px 0 8px">' + esc(S.logSt.slice(4)) + '</div><button class="chip" data-a="log">Coba lagi</button></div>';
+    return '';
+  }
+  function logAgg(L) {
+    var by = function (dm) { return L.dim.filter(function (r) { return r.dimensi === dm; }); }, T = by('tanggal'), E = by('ekspedisi'), V = by('kendaraan'), N = nv;
+    var n0 = sum(T, function (r) { return N(r.trips); }), sm = sum(T, function (r) { return N(r.sum_menit); }), top = E.slice().sort(function (a, b) { return N(b.trips) - N(a.trips); })[0];
+    return { by: by, n: n0, hari: T.length, eksp: E.length, kend: V.length, avg: n0 ? sm / n0 : NaN,
+      mn: T.length ? Math.min.apply(0, T.map(function (r) { return N(r.min_menit); })) : NaN, mx: T.length ? Math.max.apply(0, T.map(function (r) { return N(r.max_menit); })) : NaN,
+      c: sum(T, function (r) { return N(r.n_cepat); }), sd: sum(T, function (r) { return N(r.n_sedang); }), l: sum(T, function (r) { return N(r.n_lambat); }), top: top };
+  }
+  function roleTbl(L, peran) {
+    var m = {}, tot = 0;
+    L.peran.forEach(function (r) { if (r.peran !== peran) return; var k = r.nama, o = m[k] || (m[k] = { nama: k, t: 0, ar: {} }), q = nv(r.tugas); o.t += q; tot += q; var a = /^(BWB|C20|C40)$/i.test(r.armada) ? String(r.armada).toUpperCase() : 'LAIN'; o.ar[a] = (o.ar[a] || 0) + q; });
+    var arr = Object.keys(m).map(function (k) { return m[k]; });
+    return { list: arr, avg: arr.length ? tot / arr.length : 0 };
+  }
+  function stackRows(rows, segs, mx, avg) {
+    return rows.map(function (o) {
+      var bar = segs.map(function (sg) { var v = o.seg[sg.k] || 0; return v ? '<i style="width:' + (v / mx * 100).toFixed(2) + '%;background:' + sg.c + '" title="' + esc(sg.l) + ': ' + v + '"></i>' : ''; }).join('');
+      return '<div class="wr"><span class="wn">' + esc(o.nama) + '</span><div class="wt"><div class="wb">' + bar + '</div><u class="avg" style="left:' + (avg / mx * 100).toFixed(2) + '%"></u></div><b>' + n(o.t) + '</b></div>';
+    }).join('');
+  }
+  function legend(segs, avg) { return '<div class="lgd">' + segs.map(function (sg) { return '<span><i style="background:' + sg.c + '"></i>' + esc(sg.l) + '</span>'; }).join('') + '<span><i style="background:none;border-top:2px dashed #fff;height:0;width:16px"></i>Rata-rata beban kerja (' + n(avg, 1) + ')</span></div>'; }
+  function topBlock(title, ico, R) {
+    var arr = R.list.slice().sort(function (a, b) { return b.t - a.t || (a.nama < b.nama ? -1 : 1); }), top = arr.slice(0, 3), low = arr.slice().sort(function (a, b) { return a.t - b.t || (a.nama < b.nama ? -1 : 1); }).slice(0, 3);
+    var med = ['#FFB020', '#C5CAE0', '#C98A52'];
+    return '<div class="card"><h4>' + ico + ' ' + esc(title) + '</h4><div class="trh2">🏆 Top 3 Achievement</div>' + top.map(function (o, i) {
+      var d = o.t - R.avg, p = R.avg ? d / R.avg * 100 : 0;
+      return '<div class="tp"><span class="rk" style="background:' + med[i] + ';color:#1B1305">' + (i + 1) + '</span><div><b>' + esc(o.nama) + '</b><small class="up">' + (d >= 0 ? '+' : '') + n(d, 1) + ' tugas dari rata-rata peran (' + (p >= 0 ? '+' : '') + n(p, 0) + '%)</small></div><span class="tv">' + n(o.t) + ' tugas</span></div>';
+    }).join('') + '<div class="trh2" style="color:#FF6B8A">▼ 3 Terendah</div>' + low.map(function (o, i) {
+      return '<div class="tp low"><span class="rk">' + (i + 1) + '</span><div><b>' + esc(o.nama) + '</b></div><span class="tv">' + n(o.t) + ' tugas</span></div>';
+    }).join('') + '</div>';
+  }
+  function logBlock() {
+    var L = S.log, note = logNote(); if (!L || !L.dim.length) return note;
+    var A = logAgg(L), pct = function (v) { return A.n ? v / A.n * 100 : NaN; }, sla = pct(A.c + A.sd), topShare = A.top ? nv(A.top.trips) / A.n * 100 : NaN, g = function (c, v) { return '<span style="color:' + c + '">' + v + '</span>';  };
+    var cards = [
+      kpCard('#FFB020', 'Total Pengiriman', n(A.n) + '<em> unit</em>', n(A.hari) + ' hari pemantauan'),
+      kpCard('#FFB020', 'Rata-rata Durasi Loading', fDur(A.avg), 'in → out, seluruh pengiriman'),
+      kpCard('#FFB020', 'Ekspedisi Aktif', n(A.eksp) + '<em> perusahaan</em>', 'mitra ekspedisi berbeda'),
+      kpCard('#FF5C6C', 'SLA Loading', g(sla >= 80 ? '#4FD6A0' : '#FF6B8A', n(sla, 0) + '<em>%</em>'), n(A.c + A.sd) + ' dari ' + n(A.n) + ' pengiriman ≤90 mnt'),
+      kpCard('#FFB020', 'Konsentrasi Ekspedisi', n(topShare, 0) + '<em>%</em>', A.top ? esc(A.top.kunci) + ' — ' + n(A.top.trips) + ' dari ' + n(A.n) + ' pengiriman' : ''),
+      kpCard('#FFB020', 'Utilisasi Kendaraan', n(A.n / A.kend, 1) + '<em> trip/unit</em>', n(A.kend) + ' kendaraan unik menangani ' + n(A.n) + ' pengiriman')
+    ];
+    var seg3 = [['Cepat', A.c, '#34C9AE', '≤60 mnt'], ['Sedang', A.sd, '#FFB020', '61–90 mnt'], ['Lambat', A.l, '#FF5F5C', '>90 mnt (lewat SLA)']];
+    var ring = '<div class="card"><h4>Ringkasan Durasi Loading</h4><div class="sm" style="margin:-6px 0 12px">Sekilas pandang sebelum masuk ke detail per pengiriman.</div><div class="ms3"><div><small>Rata-rata durasi</small><b>' + fDur(A.avg, 1) + '</b></div><div><small>Tercepat</small><b>' + fDur(A.mn, 1) + '</b></div><div><small>Terlama</small><b>' + fDur(A.mx, 1) + '</b></div></div>' +
+      '<div class="sm" style="margin:12px 0 8px">Dari ' + n(A.n) + ' pengiriman, dikelompokkan berdasarkan kecepatan loading (target SLA: 90 mnt)</div><div class="sbar">' + seg3.map(function (x) { return x[1] ? '<span style="flex:' + x[1] + ';background:' + x[2] + '">' + n(pct(x[1]), 0) + '%</span>' : ''; }).join('') + '</div>' +
+      '<div class="lgd" style="margin-top:10px">' + seg3.map(function (x) { return '<span><i style="background:' + x[2] + '"></i>' + x[0] + ' · ' + n(x[1]) + ' pengiriman · ' + x[3] + '</span>'; }).join('') + '</div></div>';
+    var P = roleTbl(L, 'picker'), M = roleTbl(L, 'muat'), F = roleTbl(L, 'stuffing');
+    var pr = P.list.map(function (o) { return { nama: o.nama, t: o.t, seg: { BWB: o.ar.BWB, C20: o.ar.C20, C40: o.ar.C40, LAIN: o.ar.LAIN } }; }).sort(function (a, b) { return b.t - a.t; }).slice(0, 10), pAvg = pr.length ? sum(pr, function (o) { return o.t; }) / pr.length : 0;
+    var S1 = [{ k: 'BWB', l: 'BWB', c: '#34C9AE' }, { k: 'C20', l: 'C20', c: '#FFB020' }, { k: 'C40', l: 'C40', c: '#FF5F5C' }, { k: 'LAIN', l: 'Lainnya', c: '#8E93B8' }];
+    var mm = {}; M.list.forEach(function (o) { mm[o.nama] = mm[o.nama] || { nama: o.nama, m: 0, f: 0 }; mm[o.nama].m += o.t; }); F.list.forEach(function (o) { mm[o.nama] = mm[o.nama] || { nama: o.nama, m: 0, f: 0 }; mm[o.nama].f += o.t; });
+    var mac = Object.keys(mm).map(function (k) { var o = mm[k]; return { nama: o.nama, t: o.m + o.f, seg: { M: o.m, F: o.f } }; }).sort(function (a, b) { return b.t - a.t; }).slice(0, 10), mAvg = mac.length ? sum(mac, function (o) { return o.t; }) / mac.length : 0;
+    var S2 = [{ k: 'M', l: 'Muat', c: '#FFB020' }, { k: 'F', l: 'Stuffing', c: '#34C9AE' }];
+    var yam = '<div class="card"><h4>Yamazumi Chart — Beban Kerja Picker</h4><div class="sm" style="margin:-6px 0 12px">Tugas per picker distack per jenis armada, garis putus-putus = rata-rata beban kerja (10 teratas).</div>' + (pr.length ? '<div class="wl">' + stackRows(pr, S1, Math.max.apply(0, pr.map(function (o) { return o.t; })) * 1.05, pAvg) + '</div>' + legend(S1, pAvg) : '<div class="sm">Belum ada data picker.</div>') + '</div>';
+    var macc = '<div class="card"><h4>Multiple Activity Chart — Tim Muat &amp; Stuffing</h4><div class="sm" style="margin:-6px 0 12px">Breakdown aktivitas Muat vs Stuffing per personel, garis putus-putus = rata-rata beban kerja (10 teratas).</div>' + (mac.length ? '<div class="wl">' + stackRows(mac, S2, Math.max.apply(0, mac.map(function (o) { return o.t; })) * 1.05, mAvg) + '</div>' + legend(S2, mAvg) : '<div class="sm">Belum ada data muat/stuffing.</div>') + '</div>';
+    return '<div class="kps">' + cards.join('') + '</div>' + note + ring + yam + macc + topBlock('PICKER', '🏷️', P) + topBlock('TIM MUAT', '📦', M) + topBlock('TIM STUFFING', '🚛', F) +
+      '<div class="sm src">Sumber: tabel logistics (' + n(A.n) + ' pengiriman, ' + n(A.hari) + ' hari). Durasi negatif (jam keluar &lt; jam masuk) ditambah 24 jam seperti dashboard desktop.</div>';
+  }
+  function logSpec(key) {
+    var L = S.log; if (!L) return { wait: S.logSt === 'load' || !S.logSt, err: S.logSt && S.logSt.indexOf('err:') === 0 ? S.logSt.slice(4) : '', retry: 'log' };
+    var A = logAgg(L), N = nv, avgOf = function (r) { return N(r.trips) ? N(r.sum_menit) / N(r.trips) : 0; };
+    var LB = { ekspedisi: 'Ekspedisi', provinsi: 'Provinsi', kota: 'Kota', armada: 'Armada', driver: 'Driver', kendaraan: 'Kendaraan', tanggal: 'Hari tersibuk' };
+    var M = {
+      l_total: { t: 'Total Pengiriman', dims: ['ekspedisi', 'provinsi', 'kota', 'armada', 'driver', 'kendaraan', 'tanggal'], f: function (r) { return N(r.trips); }, x: function (v) { return n(v) + ' pengiriman'; }, p: function (r, v) { return n(v / A.n * 100, 1) + '%'; }, note: 'Jumlah pengiriman terbanyak. Persen = porsi dari seluruh pengiriman.' },
+      l_dur: { t: 'Rata-rata Durasi Loading', dims: ['ekspedisi', 'provinsi', 'armada', 'driver', 'kendaraan'], f: avgOf, min: 5, x: function (v) { return fDur(v, 1); }, p: function (r) { return n(r.trips) + ' pengiriman'; }, note: 'Rata-rata durasi loading terlama. Hanya kelompok dengan minimal 5 pengiriman.' },
+      l_eksp: { t: 'Ekspedisi Aktif', dims: ['ekspedisi'], f: function (r) { return N(r.trips); }, x: function (v) { return n(v) + ' pengiriman'; }, p: function (r, v) { return n(v / A.n * 100, 1) + '%'; }, note: 'Ekspedisi dengan pengiriman terbanyak.' },
+      l_sla: { t: 'SLA Loading — melewati 90 mnt', dims: ['ekspedisi', 'provinsi', 'armada', 'driver', 'kendaraan'], f: function (r) { return N(r.n_lambat); }, x: function (v) { return n(v) + ' lambat'; }, p: function (r, v) { return n(v / N(r.trips) * 100, 0) + '% dari ' + n(r.trips); }, note: 'Jumlah pengiriman dengan loading > 90 menit. Persen = porsi dari pengiriman kelompok itu sendiri.' },
+      l_konsen: { t: 'Konsentrasi Ekspedisi', dims: ['ekspedisi', 'provinsi'], f: function (r) { return N(r.trips); }, x: function (v) { return n(v) + ' pengiriman'; }, p: function (r, v) { return n(v / A.n * 100, 1) + '%'; }, note: 'Porsi pengiriman terbesar. Persen = porsi dari seluruh pengiriman.' },
+      l_util: { t: 'Utilisasi Kendaraan', dims: ['kendaraan', 'armada', 'driver'], f: function (r) { return N(r.trips); }, x: function (v) { return n(v) + ' trip'; }, p: function (r, v) { return n(v / A.n * 100, 1) + '%'; }, note: 'Kendaraan / armada / driver dengan trip terbanyak.' }
+    }[key];
+    if (!M) return null;
+    return { title: M.t, sub: 'Top 10 data teratas · sumber tabel logistics', tabs: M.dims.map(function (dm) {
+      var rs = A.by(dm).filter(function (r) { return !M.min || N(r.trips) >= M.min; }).map(function (r) { return { r: r, v: M.f(r) }; }).filter(function (x) { return x.v > 0; }).sort(function (a, b) { return b.v - a.v; }).slice(0, 10);
+      return { id: dm, label: LB[dm], note: M.note, rows: rs.map(function (x) { return { l: dm === 'tanggal' ? fmtD(x.r.kunci) : String(x.r.kunci), s: dm === 'tanggal' ? '' : n(x.r.trips) + ' pengiriman · rata-rata ' + fDur(avgOf(x.r), 1), v: x.v, x: M.x(x.v), p: M.p(x.r, x.v) }; }) };
+    }) };
   }
 
   function detail(k) {
@@ -502,6 +596,7 @@
       '<div class="ds"><small>Status:</small><span class="pill ' + c + '">' + (z.raw ? 'Aktif' : lbl(v)) + '</span></div><button class="fb" data-a="reload" aria-label="Segarkan">' + ic('ref') + '</button></div>' +
       (isS ? stockKpis(d, T) + stockAnalysis(d, T) + scatter(T, sr) : '') +
       (k === 'fefo' ? fefBlock() : '') +
+      (k === 'logistics' ? logBlock() : '') +
       (tri.length ? '<div class="tri">' + tri.map(function (x) { return '<div><small>' + esc(x[0]) + '</small><b>' + esc(x[1]) + '</b></div>'; }).join('') + '</div>' : '') +
       (rest.length ? '<div class="tb"><div class="tbh"><span>Indikator</span><span>Nilai</span></div>' + rest.map(function (x) { return '<div class="tbr"><span>' + esc(x[0]) + '</span><b>' + esc(x[1]) + '</b></div>'; }).join('') + '</div>' : '') +
       g;
@@ -608,6 +703,7 @@
     else if (t.dataset.a === 'stk') stkLoad(1);
     else if (t.dataset.a === 'fef') fefLoad(1);
     else if (t.dataset.a === 'dim') dimLoad(1);
+    else if (t.dataset.a === 'log') logLoad(1);
     else if (t.dataset.a === 'stkT') { var iv = (document.getElementById('stkT') || {}).value || ''; iv = iv.trim().replace(/^public\./, ''); if (/^\w+$/.test(iv)) { try { localStorage.setItem('scm_stk_t', iv); } catch (e) {} stkLoad(1); } }
     else if (t.dataset.a === 'out') { sessionStorage.removeItem('scm_face_ok'); try { localStorage.removeItem(CK); } catch (e) {} window.scmSupabase.auth.signOut().then(function () { location.replace('/'); }); }
   });

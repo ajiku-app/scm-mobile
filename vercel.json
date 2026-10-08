@@ -7,6 +7,12 @@
     "api/analisis.js": {
       "maxDuration": 60
     },
+    "api/logistics.js": {
+      "maxDuration": 60
+    },
+    "api/fefo.js": {
+      "maxDuration": 60
+    },
     "api/stok.js": {
       "maxDuration": 60
     },

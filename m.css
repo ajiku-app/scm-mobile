@@ -226,3 +226,18 @@ body{background:radial-gradient(520px 360px at 85% -60px,rgba(46,60,230,.35),tra
 .mbar{display:block;height:5px;border-radius:3px;background:rgba(255,255,255,.08);margin-top:6px;overflow:hidden}.mbar u{display:block;height:100%;border-radius:3px;background:linear-gradient(90deg,#4F7BFF,#6FA8FF);text-decoration:none}.mbar.crit u{background:linear-gradient(90deg,#FF2E7E,#FFA11E)}
 .mv{flex:none;text-align:right;max-width:42%}.mv b{display:block;font-size:13.5px;font-weight:600}.mv small{color:var(--m);font-size:11.5px}
 .mft{padding:10px 18px 16px;font-size:11.5px;color:var(--m);border-top:1px solid var(--ln)}
+
+/* ===== Logistik ===== */
+.ms3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.ms3>div{background:rgba(255,255,255,.04);border:1px solid var(--ln);border-radius:12px;padding:10px}
+.ms3 small{display:block;font-size:11px;color:var(--m);margin-bottom:4px}.ms3 b{font-size:14px;font-weight:600;line-height:1.2;display:block}
+.sbar{display:flex;height:34px;border-radius:10px;overflow:hidden;font-size:12px;font-weight:700;color:#1B1305}.sbar span{display:grid;place-items:center;min-width:0}
+.wl{display:flex;flex-direction:column;gap:9px;margin-bottom:10px}
+.wr{display:grid;grid-template-columns:34% 1fr 30px;gap:8px;align-items:center}
+.wn{font-size:11.5px;color:#C9CFF0;line-height:1.25;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.wt{position:relative;height:18px}.wb{display:flex;height:100%;border-radius:4px;overflow:hidden;background:rgba(255,255,255,.04)}.wb i{display:block;height:100%}
+.wt .avg{position:absolute;top:-3px;bottom:-3px;border-left:2px dashed rgba(255,255,255,.7);text-decoration:none}
+.wr>b{text-align:right;font-size:12px;font-weight:600}
+.trh2{font-size:12px;font-weight:600;letter-spacing:.02em;color:#FFB020;margin:4px 0 8px;text-transform:uppercase}.trh2:not(:first-of-type){margin-top:14px}
+.tp{display:flex;gap:10px;align-items:center;padding:9px 10px;margin-bottom:6px;background:rgba(255,255,255,.04);border-radius:12px}
+.tp>div{flex:1;min-width:0}.tp b{display:block;font-size:13px;font-weight:600;overflow-wrap:anywhere;line-height:1.3}.tp .up{display:block;color:#FFB020;font-size:11.5px;margin-top:2px}
+.tp .tv{flex:none;font-size:12px;color:var(--m)}.tp.low .rk{background:rgba(255,107,138,.2);color:#FF6B8A}
