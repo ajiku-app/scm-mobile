@@ -264,3 +264,5 @@ svg.ar g:focus-visible{outline:2px solid #FFA11E}
 .bt tbody tr{cursor:pointer}.bt tbody tr:focus-visible{outline:2px solid #FFA11E;outline-offset:-2px}
 .bt-m{font-weight:700}
 .bs0{color:#9AA3D6;background:rgba(255,255,255,.08)}
+
+.ins{margin:0;padding-left:18px;font-size:13px;line-height:1.6}.ins li{margin:0 0 10px}.ins li::marker{color:var(--m)}.ins b{font-weight:700}
